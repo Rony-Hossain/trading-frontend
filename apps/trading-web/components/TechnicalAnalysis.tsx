@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { analysisAPI, TechnicalAnalysis as TechnicalAnalysisType } from '@/lib/api'
-import { getSignalColor, formatCurrency } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { analysisAPI, TechnicalAnalysis as TechnicalAnalysisType } from '../lib/api'
+import { getSignalColor, formatCurrency } from '../lib/utils'
 import { TrendingUp, TrendingDown, Minus, Activity, Target } from 'lucide-react'
 
 interface TechnicalAnalysisProps {

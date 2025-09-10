@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { marketDataAPI, StockPrice as StockPriceType } from '@/lib/api'
-import { formatCurrency, formatPercentage, cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { marketDataAPI, StockPrice as StockPriceType } from '../lib/api'
+import { formatCurrency, formatPercentage, cn } from '../lib/utils'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 
 interface StockPriceProps {

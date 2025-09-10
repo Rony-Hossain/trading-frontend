@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { analysisAPI, ForecastData } from '@/lib/api'
-import { formatCurrency, formatPercentage, cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { analysisAPI, ForecastData } from '../lib/api'
+import { formatCurrency, formatPercentage, cn } from '../lib/utils'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { Activity, Brain, TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
 

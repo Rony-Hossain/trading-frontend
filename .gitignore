@@ -16,6 +16,11 @@
 # next.js
 /.next/
 /out/
+# Nx app-local Next.js outputs (e.g., apps/*/.next)
+apps/**/.next/
+apps/**/out/
+apps/**/build/
+apps/**/dist/
 
 # production
 /build
@@ -39,3 +44,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+
+.nx/cache
+.nx/workspace-data
+# Ignore entire Nx cache directory too
+.nx/
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md

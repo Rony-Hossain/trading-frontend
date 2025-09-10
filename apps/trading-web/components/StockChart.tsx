@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { marketDataAPI, HistoricalData } from '@/lib/api'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { marketDataAPI, HistoricalData } from '../lib/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { BarChart3, TrendingUp } from 'lucide-react'
 
