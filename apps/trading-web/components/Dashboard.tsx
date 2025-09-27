@@ -9,6 +9,7 @@ import { TechnicalIndicators } from './TechnicalIndicators'
 import { Portfolio } from './Portfolio'
 import { AlertsNotifications } from './AlertsNotifications'
 import { TradingSignals } from './TradingSignals'
+import { MLForecast } from './MLForecast'
 import { marketDataAPI } from '../lib/api'
 import { Search, Star, TrendingUp, Activity, BarChart3, LineChart, Briefcase, Bell, Zap, User, LogOut, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -173,7 +174,7 @@ export function Dashboard({ defaultSymbol = 'AAPL' }: DashboardProps) {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl w-[200px] h-[400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-12 gap-6">
           {/* Sidebar - Watchlist */}
           <div className="col-span-12 lg:col-span-3">
@@ -342,21 +343,8 @@ export function Dashboard({ defaultSymbol = 'AAPL' }: DashboardProps) {
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <TechnicalAnalysis symbol={selectedSymbol} period={chartPeriod} />
                 
-                {/* Placeholder for ML Forecast */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Activity className="h-5 w-5" />
-                      <span>ML Forecast - {selectedSymbol}</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-12">
-                      <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">ML Forecast component coming next</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* ML Forecast Component */}
+                <MLForecast symbol={selectedSymbol} modelType="ensemble" horizon={5} />
               </div>
 
               {/* Market Overview Grid */}
@@ -406,20 +394,7 @@ export function Dashboard({ defaultSymbol = 'AAPL' }: DashboardProps) {
                   <TechnicalAnalysis symbol={selectedSymbol} period={chartPeriod} />
                   
                   {/* ML Forecast */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <Activity className="h-5 w-5" />
-                        <span>ML Forecast - {selectedSymbol}</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-12">
-                        <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500">ML Forecast component coming next</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <MLForecast symbol={selectedSymbol} modelType="ensemble" horizon={5} />
                 </div>
               )}
 

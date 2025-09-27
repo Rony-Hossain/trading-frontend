@@ -37,13 +37,17 @@ class AuthAPI {
       // Mock authentication for now - in production, this would call your auth service
       await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API delay
       
-      if (credentials.email === 'demo@example.com' && credentials.password === 'password') {
+      // Accept both test accounts
+      if ((credentials.email === 'test@example.com' && credentials.password === 'password123') ||
+          (credentials.email === 'demo@example.com' && credentials.password === 'demo123')) {
+        
+        const isTestUser = credentials.email === 'test@example.com'
         const mockUser: User = {
-          id: '1',
+          id: isTestUser ? '123e4567-e89b-12d3-a456-426614174000' : '123e4567-e89b-12d3-a456-426614174001',
           email: credentials.email,
-          firstName: 'Demo',
+          firstName: isTestUser ? 'Test' : 'Demo',
           lastName: 'User',
-          avatar: 'https://ui-avatars.com/api/?name=Demo+User&background=3B82F6&color=fff',
+          avatar: `https://ui-avatars.com/api/?name=${isTestUser ? 'Test' : 'Demo'}+User&background=3B82F6&color=fff`,
           createdAt: new Date(),
           isVerified: true,
           role: 'user'
@@ -124,8 +128,13 @@ class AuthAPI {
       if (!token || !userStr) {
         return null
       }
-      
-      return JSON.parse(userStr) as User
+      const raw = JSON.parse(userStr) as any
+      // Normalize date fields serialized as strings
+      const user: User = {
+        ...raw,
+        createdAt: raw?.createdAt ? new Date(raw.createdAt) : new Date()
+      }
+      return user
     } catch (error) {
       console.error('Get current user error:', error)
       return null

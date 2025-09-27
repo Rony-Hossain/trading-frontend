@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { marketDataAPI, HistoricalData } from '../lib/api'
+import { marketDataAPI, HistoricalData, realTimeData, StockPrice } from '../lib/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { BarChart3, TrendingUp } from 'lucide-react'
 
@@ -17,24 +17,49 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [chartType, setChartType] = useState<'line' | 'area'>('area')
+  const [yDomain, setYDomain] = useState<[number, number] | null>(null)
+  const pendingTickRef = useRef<StockPrice | null>(null)
+  const flushTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const computeDomain = (points: HistoricalData[]): [number, number] => {
+    if (!points.length) return [0, 1]
+    const lows = points.map(p => p.low ?? p.close)
+    const highs = points.map(p => p.high ?? p.close)
+    const min = Math.min(...lows)
+    const max = Math.max(...highs)
+    if (min === max) return [min * 0.99, max * 1.01]
+    const pad = (max - min) * 0.02 // 2% padding to reduce axis jitter
+    return [min - pad, max + pad]
+  }
 
   useEffect(() => {
     const fetchHistoricalData = async () => {
       try {
         setLoading(true)
-        const historicalData = await marketDataAPI.getHistoricalData(symbol, period)
+        
+        // Use intraday data for 1d period, historical for others
+        const data = period === '1d' 
+          ? await marketDataAPI.getIntradayData(symbol, '1m')
+          : await marketDataAPI.getHistoricalData(symbol, period)
         
         // Process data for chart
-        const processedData = historicalData.map((item) => ({
+        const processedData = data.map((item) => ({
           ...item,
-          date: new Date(item.date).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric',
-            year: period.includes('y') ? 'numeric' : undefined
-          })
+          date: period === '1d' 
+            ? new Date(item.date).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+              })
+            : new Date(item.date).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                year: period.includes('y') ? 'numeric' : undefined
+              })
         }))
         
         setData(processedData)
+        setYDomain(computeDomain(processedData))
         setError(null)
       } catch (err) {
         setError(`Failed to fetch chart data for ${symbol}`)
@@ -46,6 +71,55 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
 
     fetchHistoricalData()
   }, [symbol, period])
+
+  // Real-time subscription: buffer ticks and flush at most once per second
+  useEffect(() => {
+    const onTick = (tick: StockPrice) => {
+      pendingTickRef.current = tick
+    }
+
+    // Start a flush timer (1000ms)
+    flushTimerRef.current = setInterval(() => {
+      const tick = pendingTickRef.current
+      if (!tick) return
+
+      pendingTickRef.current = null
+
+      const now = new Date()
+      const label = period.includes('d')
+        ? now.toLocaleTimeString('en-US', { hour12: false })
+        : now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+      const nextPoint: HistoricalData = {
+        date: label,
+        open: tick.open ?? tick.price,
+        high: tick.high ?? tick.price,
+        low: tick.low ?? tick.price,
+        close: tick.price,
+        volume: tick.volume ?? 0,
+      }
+
+      setData(prev => {
+        const updated = [...prev, nextPoint]
+        const sliced = updated.slice(Math.max(0, updated.length - 500))
+        const [minY, maxY] = yDomain ?? computeDomain(sliced)
+        if (nextPoint.low < minY || nextPoint.high > maxY) {
+          setYDomain(computeDomain(sliced))
+        }
+        return sliced
+      })
+    }, 1000)
+
+    realTimeData.subscribe(symbol, onTick)
+    return () => {
+      realTimeData.unsubscribe(symbol, onTick)
+      if (flushTimerRef.current) {
+        clearInterval(flushTimerRef.current)
+        flushTimerRef.current = null
+      }
+      pendingTickRef.current = null
+    }
+  }, [symbol, period, yDomain])
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -147,7 +221,8 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
       </CardHeader>
       
       <CardContent>
-        <ResponsiveContainer width="100%" height={height}>
+        <div style={{ width: '100%', height }}>
+        <ResponsiveContainer width="100%" height="100%">
           {chartType === 'area' ? (
             <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <defs>
@@ -164,7 +239,7 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
-                domain={['dataMin - 5', 'dataMax + 5']}
+                domain={yDomain ?? ['auto', 'auto'] as any}
                 tickFormatter={(value) => `$${value.toFixed(0)}`}
               />
               <Tooltip content={<CustomTooltip />} />
@@ -175,6 +250,7 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorPrice)"
+                isAnimationActive={false}
               />
             </AreaChart>
           ) : (
@@ -187,7 +263,7 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
-                domain={['dataMin - 5', 'dataMax + 5']}
+                domain={yDomain ?? ['auto', 'auto'] as any}
                 tickFormatter={(value) => `$${value.toFixed(0)}`}
               />
               <Tooltip content={<CustomTooltip />} />
@@ -198,10 +274,12 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4, fill: '#3B82F6' }}
+                isAnimationActive={false}
               />
             </LineChart>
           )}
         </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   )

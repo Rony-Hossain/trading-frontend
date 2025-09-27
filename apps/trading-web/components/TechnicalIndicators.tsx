@@ -39,7 +39,10 @@ export function TechnicalIndicators({ data, symbol }: TechnicalIndicatorsProps) 
 
   // Calculate technical indicators
   useEffect(() => {
-    if (data.length === 0) return
+    if (!Array.isArray(data) || data.length === 0) {
+      setProcessedData([])
+      return
+    }
 
     const calculated = data.map((item, index) => {
       const closes = data.slice(Math.max(0, index - 49), index + 1).map(d => d.close)

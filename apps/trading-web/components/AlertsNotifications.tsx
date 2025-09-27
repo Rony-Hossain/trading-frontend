@@ -6,18 +6,33 @@ import { marketDataAPI } from '../lib/api'
 import { formatCurrency, formatPercentage } from '../lib/utils'
 import { Bell, BellRing, Plus, X, TrendingUp, TrendingDown, Target, AlertTriangle, Check, Settings } from 'lucide-react'
 
-interface Alert {
+interface AlertRule {
   id: string
   symbol: string
-  type: 'price_above' | 'price_below' | 'price_change' | 'volume_spike' | 'technical_signal'
-  condition: string
-  targetValue: number
-  currentValue: number
-  isActive: boolean
-  isTriggered: boolean
-  createdAt: Date
-  triggeredAt?: Date
+  alert_type: 'price_threshold' | 'price_change' | 'volume_spike' | 'technical_signal'
+  condition: 'above' | 'below' | 'crosses_above' | 'crosses_below'
+  threshold: number
+  enabled: boolean
+  cooldown_minutes: number
+  last_triggered: string | null
+  created_at: string
+}
+
+interface AlertTrigger {
+  rule_id: string
+  symbol: string
   message: string
+  current_value: number
+  threshold: number
+  triggered_at: string
+}
+
+interface AlertStats {
+  total_rules: number
+  active_rules: number
+  total_triggers: number
+  recent_triggers: number
+  symbols_monitored: number
 }
 
 interface AlertsNotificationsProps {
@@ -25,170 +40,145 @@ interface AlertsNotificationsProps {
 }
 
 export function AlertsNotifications({ watchlist }: AlertsNotificationsProps) {
-  const [alerts, setAlerts] = useState<Alert[]>([])
-  const [activeNotifications, setActiveNotifications] = useState<Alert[]>([])
+  const [alertRules, setAlertRules] = useState<AlertRule[]>([])
+  const [alertTriggers, setAlertTriggers] = useState<AlertTrigger[]>([])
+  const [alertStats, setAlertStats] = useState<AlertStats | null>(null)
+  const [activeNotifications, setActiveNotifications] = useState<AlertTrigger[]>([])
   const [showCreateAlert, setShowCreateAlert] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [newAlert, setNewAlert] = useState({
     symbol: '',
-    type: 'price_above' as Alert['type'],
-    targetValue: '',
-    condition: ''
+    type: 'price_threshold' as AlertRule['alert_type'],
+    condition: 'above' as AlertRule['condition'],
+    threshold: ''
   })
 
-  // Mock alerts for demonstration
-  const mockAlerts: Alert[] = [
-    {
-      id: '1',
-      symbol: 'AAPL',
-      type: 'price_above',
-      condition: 'Price above $180',
-      targetValue: 180,
-      currentValue: 175.50,
-      isActive: true,
-      isTriggered: false,
-      createdAt: new Date('2024-01-15'),
-      message: 'AAPL price alert set for $180'
-    },
-    {
-      id: '2',
-      symbol: 'TSLA',
-      type: 'price_below',
-      condition: 'Price below $200',
-      targetValue: 200,
-      currentValue: 245.30,
-      isActive: true,
-      isTriggered: false,
-      createdAt: new Date('2024-01-14'),
-      message: 'TSLA price alert set for $200'
-    },
-    {
-      id: '3',
-      symbol: 'GOOGL',
-      type: 'price_change',
-      condition: 'Daily change > 5%',
-      targetValue: 5,
-      currentValue: 2.3,
-      isActive: true,
-      isTriggered: false,
-      createdAt: new Date('2024-01-13'),
-      message: 'GOOGL daily change alert set for 5%'
-    },
-    {
-      id: '4',
-      symbol: 'MSFT',
-      type: 'technical_signal',
-      condition: 'RSI oversold (<30)',
-      targetValue: 30,
-      currentValue: 45,
-      isActive: true,
-      isTriggered: true,
-      createdAt: new Date('2024-01-12'),
-      triggeredAt: new Date('2024-01-16'),
-      message: 'MSFT RSI oversold signal triggered'
+  // Load alert data from backend
+  const loadAlerts = async () => {
+    try {
+      setLoading(true)
+      const [statsResponse, triggersResponse] = await Promise.all([
+        marketDataAPI.getAlertStats(),
+        marketDataAPI.getAlertTriggers(50)
+      ])
+      
+      setAlertStats(statsResponse)
+      setAlertTriggers(triggersResponse.triggers || [])
+      
+      // Load rules for each symbol in watchlist
+      const allRules: AlertRule[] = []
+      for (const symbol of watchlist) {
+        try {
+          const rulesResponse = await marketDataAPI.getAlertRules(symbol)
+          if (rulesResponse.rules) {
+            allRules.push(...rulesResponse.rules)
+          }
+        } catch (err) {
+          console.error(`Error loading rules for ${symbol}:`, err)
+        }
+      }
+      setAlertRules(allRules)
+      
+    } catch (error) {
+      console.error('Error loading alerts:', error)
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
   useEffect(() => {
-    setAlerts(mockAlerts)
+    loadAlerts()
     
-    // Simulate checking alerts every 30 seconds
-    const interval = setInterval(async () => {
-      await checkAlerts()
+    // Check for new alert triggers every 30 seconds
+    const interval = setInterval(() => {
+      loadAlerts()
     }, 30000)
-
-    // Initial check
-    checkAlerts()
 
     return () => clearInterval(interval)
   }, [watchlist])
 
-  const checkAlerts = async () => {
-    const triggeredAlerts: Alert[] = []
-
-    for (const alert of alerts) {
-      if (!alert.isActive || alert.isTriggered) continue
-
-      try {
-        // Simulate checking current price/conditions
-        const shouldTrigger = Math.random() > 0.95 // 5% chance to trigger for demo
-
-        if (shouldTrigger) {
-          const triggeredAlert: Alert = {
-            ...alert,
-            isTriggered: true,
-            triggeredAt: new Date(),
-            message: `Alert triggered: ${alert.condition} for ${alert.symbol}`
-          }
-          
-          triggeredAlerts.push(triggeredAlert)
-          
-          // Show browser notification if supported
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(`Trading Alert: ${alert.symbol}`, {
-              body: alert.condition,
-              icon: '/favicon.ico'
-            })
-          }
+  // Check for new alert triggers and show notifications
+  useEffect(() => {
+    const newTriggers = alertTriggers.filter(trigger => 
+      !activeNotifications.some(active => active.rule_id === trigger.rule_id && 
+        active.triggered_at === trigger.triggered_at)
+    )
+    
+    if (newTriggers.length > 0) {
+      setActiveNotifications(prev => [...prev, ...newTriggers])
+      
+      // Show browser notifications for new triggers
+      newTriggers.forEach(trigger => {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(`Trading Alert: ${trigger.symbol}`, {
+            body: trigger.message,
+            icon: '/favicon.ico'
+          })
         }
-      } catch (error) {
-        console.error(`Error checking alert for ${alert.symbol}:`, error)
-      }
+      })
     }
+  }, [alertTriggers])
 
-    if (triggeredAlerts.length > 0) {
-      setActiveNotifications(prev => [...prev, ...triggeredAlerts])
-      setAlerts(prev => prev.map(alert => 
-        triggeredAlerts.find(t => t.id === alert.id) || alert
-      ))
-    }
-  }
-
-  const createAlert = (e: React.FormEvent) => {
+  const createAlert = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (newAlert.symbol && newAlert.targetValue) {
-      const alert: Alert = {
-        id: Date.now().toString(),
-        symbol: newAlert.symbol.toUpperCase(),
-        type: newAlert.type,
-        condition: getConditionText(newAlert.type, newAlert.targetValue),
-        targetValue: parseFloat(newAlert.targetValue),
-        currentValue: 0,
-        isActive: true,
-        isTriggered: false,
-        createdAt: new Date(),
-        message: `Alert created for ${newAlert.symbol}`
+    if (newAlert.symbol && newAlert.threshold) {
+      try {
+        setLoading(true)
+        await marketDataAPI.createAlertRule(
+          newAlert.symbol.toUpperCase(),
+          newAlert.type,
+          newAlert.condition,
+          parseFloat(newAlert.threshold)
+        )
+        
+        // Reload alerts to show the new rule
+        await loadAlerts()
+        
+        setNewAlert({ symbol: '', type: 'price_threshold', condition: 'above', threshold: '' })
+        setShowCreateAlert(false)
+      } catch (error) {
+        console.error('Error creating alert:', error)
+        alert('Failed to create alert. Please try again.')
+      } finally {
+        setLoading(false)
       }
-
-      setAlerts(prev => [...prev, alert])
-      setNewAlert({ symbol: '', type: 'price_above', targetValue: '', condition: '' })
-      setShowCreateAlert(false)
     }
   }
 
-  const getConditionText = (type: Alert['type'], value: number): string => {
-    switch (type) {
-      case 'price_above': return `Price above $${value}`
-      case 'price_below': return `Price below $${value}`
-      case 'price_change': return `Daily change > ${value}%`
-      case 'volume_spike': return `Volume spike > ${value}x average`
-      case 'technical_signal': return `Technical signal: ${value}`
-      default: return `Alert condition: ${value}`
+  const getConditionText = (alertType: AlertRule['alert_type'], condition: AlertRule['condition'], threshold: number): string => {
+    if (alertType === 'price_threshold') {
+      return `Price ${condition} $${threshold}`
+    } else if (alertType === 'price_change') {
+      return `Price change ${condition === 'above' ? '>' : '<'} ${threshold}%`
+    } else if (alertType === 'volume_spike') {
+      return `Volume spike ${threshold}x average`
+    }
+    return `${alertType}: ${threshold}`
+  }
+
+  const deleteAlert = async (ruleId: string) => {
+    try {
+      setLoading(true)
+      await marketDataAPI.deleteAlertRule(ruleId)
+      await loadAlerts()
+    } catch (error) {
+      console.error('Error deleting alert:', error)
+      alert('Failed to delete alert. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const deleteAlert = (alertId: string) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== alertId))
+  // Note: Toggle functionality would require backend API update
+  // For now, we'll disable the toggle and only allow delete
+  const toggleAlert = (ruleId: string) => {
+    console.log('Toggle alert not implemented in backend yet:', ruleId)
   }
 
-  const toggleAlert = (alertId: string) => {
-    setAlerts(prev => prev.map(alert => 
-      alert.id === alertId ? { ...alert, isActive: !alert.isActive } : alert
+  const dismissNotification = (ruleId: string, triggeredAt: string) => {
+    setActiveNotifications(prev => prev.filter(trigger => 
+      !(trigger.rule_id === ruleId && trigger.triggered_at === triggeredAt)
     ))
-  }
-
-  const dismissNotification = (alertId: string) => {
-    setActiveNotifications(prev => prev.filter(alert => alert.id !== alertId))
   }
 
   const requestNotificationPermission = async () => {
@@ -197,8 +187,8 @@ export function AlertsNotifications({ watchlist }: AlertsNotificationsProps) {
     }
   }
 
-  const activeAlertsCount = alerts.filter(alert => alert.isActive && !alert.isTriggered).length
-  const triggeredAlertsCount = alerts.filter(alert => alert.isTriggered).length
+  const activeAlertsCount = alertStats?.active_rules || 0
+  const triggeredAlertsCount = alertStats?.recent_triggers || 0
 
   return (
     <div className="space-y-6">
@@ -207,19 +197,19 @@ export function AlertsNotifications({ watchlist }: AlertsNotificationsProps) {
         <div className="fixed top-20 right-4 z-50 space-y-2 max-w-sm">
           {activeNotifications.slice(0, 3).map((notification) => (
             <div
-              key={notification.id}
+              key={`${notification.rule_id}-${notification.triggered_at}`}
               className="bg-red-500 text-white p-4 rounded-lg shadow-lg border border-red-600 animate-pulse"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="font-bold text-sm">{notification.symbol} Alert</div>
-                  <div className="text-sm">{notification.condition}</div>
+                  <div className="text-sm">{notification.message}</div>
                   <div className="text-xs opacity-90 mt-1">
-                    {notification.triggeredAt?.toLocaleTimeString()}
+                    {new Date(notification.triggered_at).toLocaleTimeString()}
                   </div>
                 </div>
                 <button
-                  onClick={() => dismissNotification(notification.id)}
+                  onClick={() => dismissNotification(notification.rule_id, notification.triggered_at)}
                   className="ml-2 text-white hover:text-gray-200"
                 >
                   <X className="h-4 w-4" />
@@ -313,22 +303,32 @@ export function AlertsNotifications({ watchlist }: AlertsNotificationsProps) {
 
                 <select
                   value={newAlert.type}
-                  onChange={(e) => setNewAlert({...newAlert, type: e.target.value as Alert['type']})}
+                  onChange={(e) => setNewAlert({...newAlert, type: e.target.value as AlertRule['alert_type']})}
                   className="px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  <option value="price_above">Price Above</option>
-                  <option value="price_below">Price Below</option>
-                  <option value="price_change">Daily Change %</option>
+                  <option value="price_threshold">Price Threshold</option>
+                  <option value="price_change">Price Change %</option>
                   <option value="volume_spike">Volume Spike</option>
                   <option value="technical_signal">Technical Signal</option>
                 </select>
+                
+                {newAlert.type === 'price_threshold' && (
+                  <select
+                    value={newAlert.condition}
+                    onChange={(e) => setNewAlert({...newAlert, condition: e.target.value as AlertRule['condition']})}
+                    className="px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="above">Above</option>
+                    <option value="below">Below</option>
+                  </select>
+                )}
 
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="Target Value"
-                  value={newAlert.targetValue}
-                  onChange={(e) => setNewAlert({...newAlert, targetValue: e.target.value})}
+                  placeholder="Threshold Value"
+                  value={newAlert.threshold}
+                  onChange={(e) => setNewAlert({...newAlert, threshold: e.target.value})}
                   className="px-3 py-2 border border-gray-300 rounded-md"
                   required
                 />
@@ -353,76 +353,75 @@ export function AlertsNotifications({ watchlist }: AlertsNotificationsProps) {
           )}
 
           {/* Alerts List */}
+          {loading && (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+          )}
+          
           <div className="space-y-3">
-            {alerts.length === 0 ? (
+            {alertRules.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No alerts configured. Create your first alert to get started.
               </div>
             ) : (
-              alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`p-4 rounded-lg border ${
-                    alert.isTriggered 
-                      ? 'bg-red-50 border-red-200' 
-                      : alert.isActive 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-gray-50 border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <div className="font-medium text-lg">{alert.symbol}</div>
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          alert.isTriggered 
-                            ? 'bg-red-100 text-red-800' 
-                            : alert.isActive 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {alert.isTriggered ? 'Triggered' : alert.isActive ? 'Active' : 'Inactive'}
+              alertRules.map((rule) => {
+                const hasRecentTrigger = alertTriggers.some(trigger => trigger.rule_id === rule.id)
+                return (
+                  <div
+                    key={rule.id}
+                    className={`p-4 rounded-lg border ${
+                      hasRecentTrigger
+                        ? 'bg-red-50 border-red-200' 
+                        : rule.enabled
+                          ? 'bg-green-50 border-green-200' 
+                          : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div className="font-medium text-lg">{rule.symbol}</div>
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            hasRecentTrigger
+                              ? 'bg-red-100 text-red-800' 
+                              : rule.enabled
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {hasRecentTrigger ? 'Recently Triggered' : rule.enabled ? 'Active' : 'Disabled'}
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {getConditionText(rule.alert_type, rule.condition, rule.threshold)}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Created: {new Date(rule.created_at).toLocaleDateString()}
+                          {rule.last_triggered && (
+                            <span className="ml-3">
+                              Last triggered: {new Date(rule.last_triggered).toLocaleDateString()}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="text-sm text-gray-600 mt-1">{alert.condition}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Created: {alert.createdAt.toLocaleDateString()}
-                        {alert.triggeredAt && (
-                          <span className="ml-3">
-                            Triggered: {alert.triggeredAt.toLocaleDateString()} {alert.triggeredAt.toLocaleTimeString()}
-                          </span>
+
+                      <div className="flex items-center space-x-2">
+                        {hasRecentTrigger && (
+                          <AlertTriangle className="h-5 w-5 text-red-600" />
                         )}
+                        <button
+                          onClick={() => deleteAlert(rule.id)}
+                          className="p-2 text-red-600 hover:bg-red-100 rounded-full"
+                          title="Delete Alert"
+                          disabled={loading}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex items-center space-x-2">
-                      {alert.isTriggered && (
-                        <AlertTriangle className="h-5 w-5 text-red-600" />
-                      )}
-                      {!alert.isTriggered && (
-                        <button
-                          onClick={() => toggleAlert(alert.id)}
-                          className={`p-2 rounded-full ${
-                            alert.isActive 
-                              ? 'text-green-600 hover:bg-green-100' 
-                              : 'text-gray-400 hover:bg-gray-100'
-                          }`}
-                          title={alert.isActive ? 'Disable Alert' : 'Enable Alert'}
-                        >
-                          <Bell className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => deleteAlert(alert.id)}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-full"
-                        title="Delete Alert"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </CardContent>
@@ -438,21 +437,19 @@ export function AlertsNotifications({ watchlist }: AlertsNotificationsProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {alerts
-              .filter(alert => alert.isTriggered)
-              .sort((a, b) => (b.triggeredAt?.getTime() || 0) - (a.triggeredAt?.getTime() || 0))
+            {alertTriggers
               .slice(0, 10)
-              .map((alert) => (
+              .map((trigger) => (
                 <div
-                  key={alert.id}
+                  key={`${trigger.rule_id}-${trigger.triggered_at}`}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center space-x-3">
                     <BellRing className="h-4 w-4 text-red-600" />
                     <div>
-                      <div className="font-medium text-sm">{alert.symbol} - {alert.condition}</div>
+                      <div className="font-medium text-sm">{trigger.symbol} - {trigger.message}</div>
                       <div className="text-xs text-gray-500">
-                        {alert.triggeredAt?.toLocaleString()}
+                        {new Date(trigger.triggered_at).toLocaleString()}
                       </div>
                     </div>
                   </div>
@@ -460,7 +457,7 @@ export function AlertsNotifications({ watchlist }: AlertsNotificationsProps) {
                 </div>
               ))}
             
-            {alerts.filter(alert => alert.isTriggered).length === 0 && (
+            {alertTriggers.length === 0 && (
               <div className="text-center py-4 text-gray-500">
                 No recent notifications
               </div>

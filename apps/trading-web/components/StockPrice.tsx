@@ -77,12 +77,12 @@ export function StockPrice({ symbol, className }: StockPriceProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <div className="text-2xl font-bold">
+          <div className="text-2xl font-bold tabular-nums">
             {formatCurrency(stockData.price)}
           </div>
           
           <div className={cn(
-            "flex items-center space-x-1 text-sm font-medium",
+            "flex items-center space-x-1 text-sm font-medium tabular-nums",
             isPositive ? "text-green-600" : "text-red-600"
           )}>
             {isPositive ? (
@@ -94,15 +94,15 @@ export function StockPrice({ symbol, className }: StockPriceProps) {
               {isPositive ? '+' : ''}{formatCurrency(stockData.change)}
             </span>
             <span>
-              ({formatPercentage(stockData.changePercent)})
+              ({formatPercentage(stockData.change_percent)})
             </span>
           </div>
           
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-500 tabular-nums">
             Volume: {stockData.volume?.toLocaleString() || 'N/A'}
           </div>
           
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 tabular-nums">
             Updated: {new Date(stockData.timestamp || Date.now()).toLocaleTimeString()}
           </div>
         </div>

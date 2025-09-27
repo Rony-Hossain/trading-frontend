@@ -89,17 +89,17 @@ export function TechnicalAnalysis({ symbol, period = '6mo' }: TechnicalAnalysisP
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Overall Signal */}
+        {/* Market Status */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Target className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold">Overall Signal</span>
+              <span className="font-semibold">Market Status</span>
             </div>
-            <div className={`flex items-center space-x-2 font-semibold ${getSignalColor(analysis.signals.overall_signal)}`}>
-              {getSignalIcon(analysis.signals.overall_signal)}
-              <span>{analysis.signals.overall_signal}</span>
-              <span className="text-sm">({analysis.signals.strength}/100)</span>
+            <div className={`flex items-center space-x-2 font-semibold ${getSignalColor(analysis.market_status.status)}`}>
+              {getSignalIcon(analysis.market_status.direction)}
+              <span>{analysis.market_status.status}</span>
+              <span className="text-sm">({analysis.market_status.momentum} momentum)</span>
             </div>
           </div>
         </div>
@@ -107,104 +107,68 @@ export function TechnicalAnalysis({ symbol, period = '6mo' }: TechnicalAnalysisP
         {/* Current Price */}
         <div className="flex justify-between items-center">
           <span className="font-medium">Current Price</span>
-          <span className="text-xl font-bold">{formatCurrency(analysis.current_price)}</span>
+          <span className="text-xl font-bold">{formatCurrency(analysis.realtime_data.current_price)}</span>
         </div>
 
-        {/* Moving Averages */}
+        {/* Technical Indicators */}
         <div className="space-y-2">
-          <h4 className="font-semibold text-gray-700">Moving Averages</h4>
+          <h4 className="font-semibold text-gray-700">Technical Analysis</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
-            {analysis.moving_averages.sma_20 && (
-              <div className="flex justify-between">
-                <span>SMA 20</span>
-                <span>{formatCurrency(analysis.moving_averages.sma_20)}</span>
+            <div className="flex justify-between">
+              <span>1-Day Change</span>
+              <span className={analysis.quick_technical.price_change_1d >= 0 ? 'text-green-600' : 'text-red-600'}>
+                {analysis.quick_technical.price_change_1d >= 0 ? '+' : ''}${analysis.quick_technical.price_change_1d.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>5-Day Change</span>
+              <span className={analysis.quick_technical.price_change_5d >= 0 ? 'text-green-600' : 'text-red-600'}>
+                {analysis.quick_technical.price_change_5d >= 0 ? '+' : ''}${analysis.quick_technical.price_change_5d.toFixed(2)}
+              </span>
               </div>
-            )}
-            {analysis.moving_averages.sma_50 && (
-              <div className="flex justify-between">
-                <span>SMA 50</span>
-                <span>{formatCurrency(analysis.moving_averages.sma_50)}</span>
-              </div>
-            )}
-            {analysis.moving_averages.ema_12 && (
-              <div className="flex justify-between">
-                <span>EMA 12</span>
-                <span>{formatCurrency(analysis.moving_averages.ema_12)}</span>
-              </div>
-            )}
-            {analysis.moving_averages.ema_26 && (
-              <div className="flex justify-between">
-                <span>EMA 26</span>
-                <span>{formatCurrency(analysis.moving_averages.ema_26)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Oscillators */}
-        <div className="space-y-2">
-          <h4 className="font-semibold text-gray-700">Oscillators</h4>
-          <div className="text-sm">
-            {analysis.oscillators.rsi_14 && (
-              <div className="flex justify-between">
-                <span>RSI (14)</span>
-                <div className="flex items-center space-x-2">
-                  <span>{analysis.oscillators.rsi_14.toFixed(2)}</span>
-                  <span className={`text-xs ${
-                    analysis.oscillators.rsi_14 > 70 ? 'text-red-600' :
-                    analysis.oscillators.rsi_14 < 30 ? 'text-green-600' :
-                    'text-gray-600'
-                  }`}>
-                    {analysis.oscillators.rsi_14 > 70 ? 'Overbought' :
-                     analysis.oscillators.rsi_14 < 30 ? 'Oversold' : 'Neutral'}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* MACD */}
-        {analysis.macd.macd && (
-          <div className="space-y-2">
-            <h4 className="font-semibold text-gray-700">MACD</h4>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div className="text-center">
-                <div className="text-xs text-gray-500">MACD</div>
-                <div className="font-medium">{analysis.macd.macd.toFixed(4)}</div>
-              </div>
-              {analysis.macd.signal && (
-                <div className="text-center">
-                  <div className="text-xs text-gray-500">Signal</div>
-                  <div className="font-medium">{analysis.macd.signal.toFixed(4)}</div>
-                </div>
-              )}
-              {analysis.macd.histogram && (
-                <div className="text-center">
-                  <div className="text-xs text-gray-500">Histogram</div>
-                  <div className={`font-medium ${analysis.macd.histogram > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {analysis.macd.histogram.toFixed(4)}
-                  </div>
-                </div>
-              )}
+            <div className="flex justify-between">
+              <span>Volume Ratio</span>
+              <span className={analysis.quick_technical.volume_ratio >= 1 ? 'text-green-600' : 'text-red-600'}>
+                {analysis.quick_technical.volume_ratio.toFixed(2)}x
+              </span>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Individual Signals */}
+        {/* Volatility Analysis */}
         <div className="space-y-2">
-          <h4 className="font-semibold text-gray-700">Individual Signals</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            {Object.entries(analysis.signals.individual_signals).map(([indicator, signal]) => (
-              <div key={indicator} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <span className="capitalize">{indicator.replace('_', ' ')}</span>
-                <div className={`flex items-center space-x-1 ${getSignalColor(signal)}`}>
-                  {getSignalIcon(signal)}
-                  <span className="font-medium">{signal}</span>
-                </div>
-              </div>
-            ))}
+          <h4 className="font-semibold text-gray-700">Volatility Analysis</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex justify-between">
+              <span>5-Day Volatility</span>
+              <span>{(analysis.realtime_data.volatility_5d * 100).toFixed(2)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span>20-Day Volatility</span>
+              <span>{(analysis.quick_technical.volatility_20d * 100).toFixed(2)}%</span>
+            </div>
           </div>
+        </div>
+
+        {/* Market Data */}
+        <div className="space-y-2">
+          <h4 className="font-semibold text-gray-700">Market Data</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex justify-between">
+              <span>Average Volume (5d)</span>
+              <span>{Math.round(analysis.realtime_data.avg_volume_5d).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Data Source</span>
+              <span className="text-blue-600">{analysis.realtime_data.source}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Analysis Info */}
+        <div className="text-xs text-gray-500 border-t pt-4">
+          <p>Last updated: {new Date(analysis.analysis_timestamp).toLocaleString()}</p>
+          <p>Data from: {analysis.realtime_data.source}</p>
         </div>
       </CardContent>
     </Card>

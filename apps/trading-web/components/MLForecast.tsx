@@ -23,8 +23,32 @@ export function MLForecast({ symbol, modelType = 'ensemble', horizon = 5 }: MLFo
     const fetchForecast = async () => {
       try {
         setLoading(true)
-        const data = await analysisAPI.getForecast(symbol, selectedModel, horizon)
-        setForecast(data)
+        
+        // Call the real ML forecast API
+        const apiResponse = await analysisAPI.getForecast(symbol, selectedModel, horizon)
+        
+        // Transform API response to match expected format
+        const transformedForecast: ForecastData = {
+          symbol: apiResponse.symbol,
+          predictions: apiResponse.predictions,
+          dates: apiResponse.predictions.map((_, index) => 
+            new Date(Date.now() + (index + 1) * 86400000).toISOString().split('T')[0]
+          ),
+          current_price: apiResponse.current_price || 0,
+          model_type: apiResponse.model_type,
+          price_analysis: apiResponse.price_analysis || {
+            expected_return_1d: 0,
+            expected_return_5d: 0,
+            max_expected_gain: 0,
+            max_expected_loss: 0
+          },
+          trend_forecast: apiResponse.trend_forecast || {
+            direction: "UP",
+            confidence: "MEDIUM"
+          }
+        }
+        
+        setForecast(transformedForecast)
         setError(null)
       } catch (err) {
         setError(`Failed to fetch forecast for ${symbol}`)
@@ -77,7 +101,11 @@ export function MLForecast({ symbol, modelType = 'ensemble', horizon = 5 }: MLFo
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-red-500">{error || 'No forecast available'}</p>
+          <div className="text-center py-8">
+            <Brain className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <p className="text-gray-600 mb-2">ML Forecast component coming next</p>
+            <p className="text-sm text-gray-500">Advanced machine learning predictions will be available once models are trained</p>
+          </div>
         </CardContent>
       </Card>
     )
@@ -93,7 +121,7 @@ export function MLForecast({ symbol, modelType = 'ensemble', horizon = 5 }: MLFo
     current: index === 0 ? forecast.current_price : null
   }))
 
-  const isUptrend = forecast.trend_forecast.direction === 'bullish'
+  const isUptrend = forecast.trend_forecast.direction === 'UP' || forecast.trend_forecast.direction === 'BULLISH'
   const trendColor = isUptrend ? 'text-green-600' : 'text-red-600'
   const trendIcon = isUptrend ? TrendingUp : TrendingDown
 

@@ -1,0 +1,444 @@
+"use client"
+
+import React, { useEffect, useState, useMemo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Button } from '@mui/material'
+
+interface OptionContract {
+  symbol: string
+  strike: number
+  expiry: string
+  option_type: 'call' | 'put'
+  bid: number
+  ask: number
+  last: number
+  mid_price: number
+  volume: number
+  open_interest: number
+  implied_volatility: number
+  bid_ask_spread: number
+  dte: number
+  greeks: {
+    delta: number
+    gamma: number
+    theta: number
+    vega: number
+    rho: number
+  }
+  intrinsic_value: number
+  extrinsic_value: number
+  break_even: number
+  liquidity_score: number
+}
+
+interface TradeSuggestion {
+  strategy: string
+  sentiment: string
+  max_profit: number
+  max_loss: number
+  break_evens: number[]
+  probability_profit: number
+  capital_required: number
+  roi_potential: number
+  liquidity_score: number
+  position_greeks: {
+    net_delta: number
+    net_theta: number
+    net_vega: number
+    net_gamma: number
+  }
+  contracts: Array<{
+    action: 'BUY' | 'SELL'
+    symbol: string
+    strike: number
+    expiry: string
+    option_type: 'call' | 'put'
+    price: number
+    bid: number
+    ask: number
+    volume: number
+    open_interest: number
+    dte: number
+    greeks: {
+      delta: number
+      theta: number
+      vega: number
+      gamma: number
+    }
+    implied_volatility: number
+    liquidity_score: number
+  }>
+}
+
+interface OptionsChain {
+  symbol: string
+  underlying_price: number
+  risk_free_rate: number
+  expiries: string[]
+  calls: OptionContract[]
+  puts: OptionContract[]
+}
+
+interface OptionsTradingProps {
+  symbol: string
+  sentiment?: 'bullish' | 'bearish' | 'neutral'
+  underlyingPrice?: number
+}
+
+export function OptionsTrading({ symbol, sentiment = 'neutral', underlyingPrice }: OptionsTradingProps) {
+  const [optionsChain, setOptionsChain] = useState<OptionsChain | null>(null)
+  const [suggestions, setSuggestions] = useState<TradeSuggestion[]>([])
+  const [loading, setLoading] = useState(false)
+  const [selectedExpiry, setSelectedExpiry] = useState<string>('')
+  const [view, setView] = useState<'suggestions' | 'chain'>('suggestions')
+
+  // Fetch options data
+  const fetchOptionsData = async () => {
+    if (!symbol) return
+    
+    setLoading(true)
+    try {
+      // Fetch suggestions
+      const suggestionsResponse = await fetch(
+        `http://localhost:8002/options/${symbol}/suggestions?sentiment=${sentiment}&target_delta=0.3&max_dte=7`
+      )
+      if (suggestionsResponse.ok) {
+        const suggestionsData = await suggestionsResponse.json()
+        setSuggestions(suggestionsData.suggestions || [])
+      }
+
+      // Fetch full options chain
+      const chainResponse = await fetch(`http://localhost:8002/options/${symbol}/chain`)
+      if (chainResponse.ok) {
+        const chainData = await chainResponse.json()
+        setOptionsChain(chainData)
+        if (chainData.expiries && chainData.expiries.length > 0) {
+          setSelectedExpiry(chainData.expiries[0])
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching options data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchOptionsData()
+  }, [symbol, sentiment])
+
+  // Filter options by selected expiry for chain view
+  const filteredOptions = useMemo(() => {
+    if (!optionsChain || !selectedExpiry) return { calls: [], puts: [] }
+    
+    return {
+      calls: optionsChain.calls.filter(opt => opt.expiry === selectedExpiry),
+      puts: optionsChain.puts.filter(opt => opt.expiry === selectedExpiry)
+    }
+  }, [optionsChain, selectedExpiry])
+
+  const formatGreek = (value: number, decimals: number = 4) => {
+    return value.toFixed(decimals)
+  }
+
+  const formatCurrency = (value: number) => {
+    return `$${value.toFixed(2)}`
+  }
+
+  const formatPercent = (value: number) => {
+    return `${(value * 100).toFixed(1)}%`
+  }
+
+  const getLiquidityColor = (score: number) => {
+    if (score >= 70) return 'text-green-600'
+    if (score >= 40) return 'text-yellow-600'
+    return 'text-red-600'
+  }
+
+  const getThetaColor = (theta: number) => {
+    return theta < 0 ? 'text-red-600' : 'text-green-600'
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Options Trading - {symbol}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-gray-500">Loading options data...</div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header with View Toggle */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Options Trading - {symbol}</CardTitle>
+            <div className="flex space-x-2">
+              <Button
+                variant={view === 'suggestions' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setView('suggestions')}
+              >
+                Trade Suggestions
+              </Button>
+              <Button
+                variant={view === 'chain' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setView('chain')}
+              >
+                Options Chain
+              </Button>
+            </div>
+          </div>
+          {optionsChain && (
+            <div className="text-sm text-gray-600">
+              Underlying: {formatCurrency(optionsChain.underlying_price)} | 
+              Risk-free rate: {formatPercent(optionsChain.risk_free_rate)}
+            </div>
+          )}
+        </CardHeader>
+      </Card>
+
+      {/* Trade Suggestions View */}
+      {view === 'suggestions' && (
+        <div className="space-y-4">
+          {suggestions.length === 0 ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="text-center text-gray-500">
+                  No trade suggestions available for {sentiment} sentiment
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            suggestions.map((suggestion, index) => (
+              <Card key={index} className="border-l-4 border-l-blue-500">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{suggestion.strategy}</CardTitle>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-600">Sentiment: {suggestion.sentiment}</div>
+                      <div className="text-sm font-medium">
+                        Liquidity: <span className={getLiquidityColor(suggestion.liquidity_score)}>
+                          {suggestion.liquidity_score.toFixed(0)}/100
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Risk/Reward Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Max Profit</div>
+                      <div className="text-lg font-bold text-green-600">
+                        {formatCurrency(suggestion.max_profit)}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Max Loss</div>
+                      <div className="text-lg font-bold text-red-600">
+                        {formatCurrency(suggestion.max_loss)}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Capital Required</div>
+                      <div className="text-lg font-bold">
+                        {formatCurrency(suggestion.capital_required)}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600">ROI Potential</div>
+                      <div className="text-lg font-bold">
+                        {suggestion.roi_potential.toFixed(0)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Position Greeks */}
+                  <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h4 className="font-semibold mb-2">Position Greeks</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Delta (Δ): </span>
+                        <span className="font-mono">{formatGreek(suggestion.position_greeks.net_delta)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Theta (Θ): </span>
+                        <span className={`font-mono ${getThetaColor(suggestion.position_greeks.net_theta)}`}>
+                          {formatGreek(suggestion.position_greeks.net_theta)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Vega (ν): </span>
+                        <span className="font-mono">{formatGreek(suggestion.position_greeks.net_vega)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Gamma (Γ): </span>
+                        <span className="font-mono">{formatGreek(suggestion.position_greeks.net_gamma)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contract Details */}
+                  <div>
+                    <h4 className="font-semibold mb-3">Contracts to Trade</h4>
+                    <div className="space-y-3">
+                      {suggestion.contracts.map((contract, contractIndex) => (
+                        <div key={contractIndex} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                contract.action === 'BUY' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {contract.action}
+                              </span>
+                              <span className="font-semibold">
+                                {contract.option_type.toUpperCase()} ${contract.strike}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                {new Date(contract.expiry).toLocaleDateString()} ({contract.dte}DTE)
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold">{formatCurrency(contract.price)}</div>
+                              <div className="text-xs text-gray-600">
+                                {formatCurrency(contract.bid)} x {formatCurrency(contract.ask)}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+                            <div>
+                              <span className="text-gray-600">Vol: </span>
+                              <span>{contract.volume.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">OI: </span>
+                              <span>{contract.open_interest.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">IV: </span>
+                              <span>{formatPercent(contract.implied_volatility)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Δ: </span>
+                              <span className="font-mono">{formatGreek(contract.greeks.delta, 3)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Θ: </span>
+                              <span className={`font-mono ${getThetaColor(contract.greeks.theta)}`}>
+                                {formatGreek(contract.greeks.theta, 3)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Liq: </span>
+                              <span className={getLiquidityColor(contract.liquidity_score)}>
+                                {contract.liquidity_score.toFixed(0)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Break-even and Probability */}
+                  <div className="mt-4 p-3 bg-blue-50 rounded">
+                    <div className="text-sm">
+                      <span className="font-semibold">Break-even: </span>
+                      {suggestion.break_evens.map(be => formatCurrency(be)).join(', ')} | 
+                      <span className="font-semibold"> Probability of Profit: </span>
+                      <span className="text-blue-600">{formatPercent(suggestion.probability_profit)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Options Chain View */}
+      {view === 'chain' && optionsChain && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Options Chain</CardTitle>
+              <select
+                value={selectedExpiry}
+                onChange={(e) => setSelectedExpiry(e.target.value)}
+                className="border rounded px-3 py-1"
+              >
+                {optionsChain.expiries.map(expiry => (
+                  <option key={expiry} value={expiry}>
+                    {new Date(expiry).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Strike</th>
+                    <th className="text-center p-2">Call Bid</th>
+                    <th className="text-center p-2">Call Ask</th>
+                    <th className="text-center p-2">Call Vol</th>
+                    <th className="text-center p-2">Call Δ</th>
+                    <th className="text-center p-2">Call Θ</th>
+                    <th className="text-center p-2">Call IV</th>
+                    <th className="text-center p-2 border-l-2">Put IV</th>
+                    <th className="text-center p-2">Put Θ</th>
+                    <th className="text-center p-2">Put Δ</th>
+                    <th className="text-center p-2">Put Vol</th>
+                    <th className="text-center p-2">Put Ask</th>
+                    <th className="text-center p-2">Put Bid</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOptions.calls.map((call, index) => {
+                    const put = filteredOptions.puts.find(p => p.strike === call.strike)
+                    const isATM = Math.abs(call.strike - optionsChain.underlying_price) <= 2.5
+                    
+                    return (
+                      <tr key={call.strike} className={`border-b hover:bg-gray-50 ${isATM ? 'bg-yellow-50' : ''}`}>
+                        <td className="p-2 font-semibold">{call.strike}</td>
+                        <td className="p-2 text-center">{call.bid.toFixed(2)}</td>
+                        <td className="p-2 text-center">{call.ask.toFixed(2)}</td>
+                        <td className="p-2 text-center">{call.volume}</td>
+                        <td className="p-2 text-center font-mono">{formatGreek(call.greeks.delta, 3)}</td>
+                        <td className={`p-2 text-center font-mono ${getThetaColor(call.greeks.theta)}`}>
+                          {formatGreek(call.greeks.theta, 3)}
+                        </td>
+                        <td className="p-2 text-center">{formatPercent(call.implied_volatility)}</td>
+                        <td className="p-2 text-center border-l-2">{put ? formatPercent(put.implied_volatility) : '-'}</td>
+                        <td className={`p-2 text-center font-mono ${put ? getThetaColor(put.greeks.theta) : ''}`}>
+                          {put ? formatGreek(put.greeks.theta, 3) : '-'}
+                        </td>
+                        <td className="p-2 text-center font-mono">{put ? formatGreek(put.greeks.delta, 3) : '-'}</td>
+                        <td className="p-2 text-center">{put ? put.volume : '-'}</td>
+                        <td className="p-2 text-center">{put ? put.ask.toFixed(2) : '-'}</td>
+                        <td className="p-2 text-center">{put ? put.bid.toFixed(2) : '-'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+export default OptionsTrading

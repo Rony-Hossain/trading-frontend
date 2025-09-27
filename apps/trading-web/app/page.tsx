@@ -1,12 +1,12 @@
-'use client'
+"use client"
 
-import { Dashboard } from '../components/Dashboard'
+import { MaterialDashboard } from '../components/material/MaterialDashboard'
 import { ProtectedRoute } from '../components/auth/ProtectedRoute'
 
 export default function Home() {
   return (
     <ProtectedRoute>
-      <Dashboard defaultSymbol="AAPL" />
+      <MaterialDashboard defaultSymbol="AAPL" />
     </ProtectedRoute>
   )
 }

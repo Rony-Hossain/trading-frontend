@@ -53,7 +53,7 @@ export function Portfolio({
         const positionsWithPrices = await Promise.all(
           mockPositions.map(async (position) => {
             try {
-              const priceData = await marketDataAPI.getCurrentPrice(position.symbol)
+              const priceData = await marketDataAPI.getStockPrice(position.symbol)
               const currentPrice = priceData.price || position.avgPrice
               const totalValue = position.shares * currentPrice
               const gainLoss = totalValue - (position.shares * position.avgPrice)
@@ -85,7 +85,7 @@ export function Portfolio({
         await Promise.all(
           watchlist.map(async (symbol) => {
             try {
-              const priceData = await marketDataAPI.getCurrentPrice(symbol)
+              const priceData = await marketDataAPI.getStockPrice(symbol)
               prices[symbol] = priceData.price || 0
             } catch (error) {
               prices[symbol] = 0

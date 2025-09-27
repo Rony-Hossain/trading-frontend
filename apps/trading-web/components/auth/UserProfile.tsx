@@ -134,7 +134,9 @@ export function UserProfile() {
                   </div>
                   <div className="flex items-center space-x-2 text-gray-600 mt-2">
                     <Calendar className="h-4 w-4" />
-                    <span>Member since {user.createdAt.toLocaleDateString()}</span>
+                    <span>
+                      Member since {new Date((user as any).createdAt).toLocaleDateString()}
+                    </span>
                   </div>
                   <button
                     onClick={() => setIsEditing(true)}

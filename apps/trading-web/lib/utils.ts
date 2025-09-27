@@ -5,7 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(value: number): string {
+export function formatCurrency(value: number | undefined | null): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return 'N/A'
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -14,11 +17,17 @@ export function formatCurrency(value: number): string {
   }).format(value)
 }
 
-export function formatPercentage(value: number): string {
+export function formatPercentage(value: number | undefined | null): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return 'N/A'
+  }
   return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
 }
 
-export function formatNumber(value: number): string {
+export function formatNumber(value: number | undefined | null): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return 'N/A'
+  }
   return new Intl.NumberFormat('en-US').format(value)
 }
 
@@ -27,13 +36,20 @@ export function getSignalColor(signal: string): string {
     case 'BUY':
     case 'STRONG_BUY':
     case 'BULLISH':
+    case 'UP':
+    case 'HIGH_UP':
       return 'text-green-600'
     case 'SELL':
     case 'STRONG_SELL':
     case 'BEARISH':
+    case 'DOWN':
+    case 'LOW_DOWN':
       return 'text-red-600'
     case 'HOLD':
     case 'NEUTRAL':
+    case 'SIDEWAYS':
+    case 'LOW':
+    case 'MEDIUM':
       return 'text-yellow-600'
     default:
       return 'text-gray-600'
