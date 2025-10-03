@@ -1,0 +1,31 @@
+{
+  "$schema": "./config.schema.json",
+  "comment": "Example remote configuration file for trading platform",
+
+  "defaultMode": "beginner",
+  "allowModeSwitch": true,
+
+  "defaultRiskAppetite": "conservative",
+  "defaultDailyLossCap": 2.0,
+  "defaultMaxPositionSize": 5.0,
+
+  "features": {
+    "paperTradingEnabled": true,
+    "expertModeEnabled": true,
+    "newsIntegrationEnabled": false,
+    "advancedChartsEnabled": false,
+    "optionsTradingEnabled": false
+  },
+
+  "defaultRegion": "US",
+  "enforcementLevel": "strict",
+
+  "defaultTheme": "auto",
+  "showBeginnerHints": true,
+
+  "apiBaseUrl": "http://localhost:8000",
+  "wsBaseUrl": "ws://localhost:8000",
+  "cacheTTL": 300000,
+
+  "vercelAnalytics": false
+}

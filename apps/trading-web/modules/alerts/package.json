@@ -1,0 +1,43 @@
+{
+  "name": "@modules/alerts",
+  "version": "1.0.0",
+  "description": "Real-time alerts system with streaming, quiet hours, and adaptive frequency",
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts",
+  "private": true,
+  "keywords": [
+    "trading",
+    "alerts",
+    "notifications",
+    "real-time",
+    "websocket",
+    "module"
+  ],
+  "author": "Trading Platform Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "@mui/material": "^7.0.0",
+    "zustand": "^4.0.0"
+  },
+  "dependencies": {
+    "@modules/auth": "workspace:*",
+    "@modules/api": "workspace:*",
+    "@modules/telemetry": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "require": "./index.ts",
+      "types": "./index.ts"
+    },
+    "./module.config": {
+      "import": "./module.config.ts",
+      "require": "./module.config.ts",
+      "types": "./module.config.ts"
+    }
+  }
+}
