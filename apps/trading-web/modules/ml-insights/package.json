@@ -1,0 +1,23 @@
+{
+  "name": "@modules/ml-insights",
+  "version": "1.0.0",
+  "description": "ML model diagnostics, market regime detection, and trade driver explanations",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./config": "./module.config.ts"
+  },
+  "keywords": [
+    "ml",
+    "insights",
+    "regime",
+    "diagnostics",
+    "drivers",
+    "confidence",
+    "trading"
+  ],
+  "phase": 6,
+  "module-type": "enhancement"
+}

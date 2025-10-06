@@ -35,6 +35,9 @@ import {
   TuneRounded as AdvancedIcon,
 } from '@mui/icons-material'
 import { useUserStore, THEME_PRESETS } from '@/lib/stores/userStore'
+import { ExpertModuleToggles } from '@/components/settings/ExpertModuleToggles'
+import { trackEvent, TelemetryCategory } from '@/lib/telemetry/taxonomy'
+import { useEffect, useState as useReactState } from 'react'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -54,6 +57,37 @@ export default function SettingsPage() {
   const { preferences, updatePreferences } = useUserStore()
   const [activeTab, setActiveTab] = useState(0)
   const [saved, setSaved] = useState(false)
+  const [expertModules, setExpertModules] = useReactState<Record<string, boolean>>({
+    indicators: false,
+    options: false,
+    diagnostics: false,
+  })
+
+  // Load expert module states from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('expertModules')
+    if (stored) {
+      try {
+        setExpertModules(JSON.parse(stored))
+      } catch (e) {
+        console.error('Failed to parse expert modules state:', e)
+      }
+    }
+  }, [])
+
+  const handleModuleToggle = (moduleId: string, enabled: boolean) => {
+    const newModules = { ...expertModules, [moduleId]: enabled }
+    setExpertModules(newModules)
+    localStorage.setItem('expertModules', JSON.stringify(newModules))
+
+    trackEvent({
+      category: TelemetryCategory.SETTINGS,
+      action: 'setting_changed',
+      setting_key: `expert_module_${moduleId}`,
+      old_value: expertModules[moduleId],
+      new_value: enabled,
+    })
+  }
 
   const handleSave = () => {
     setSaved(true)
@@ -491,6 +525,21 @@ export default function SettingsPage() {
                     })
                   }
                   helperText="Maximum number of concurrent real-time data streams"
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                  Expert Modules
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Enable advanced features for expert trading mode
+                </Typography>
+                <ExpertModuleToggles
+                  mode={preferences.dashboardMode}
+                  enabledModules={expertModules}
+                  onModuleToggle={handleModuleToggle}
                 />
               </Grid>
             </Grid>

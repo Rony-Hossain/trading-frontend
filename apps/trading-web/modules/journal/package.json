@@ -1,0 +1,41 @@
+{
+  "name": "@modules/journal",
+  "version": "1.0.0",
+  "description": "Trading journal with auto-ingest, filtering, tags, and export",
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts",
+  "private": true,
+  "keywords": [
+    "trading",
+    "journal",
+    "diary",
+    "notes",
+    "logging",
+    "module"
+  ],
+  "author": "Trading Platform Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@tanstack/react-query": "^5.0.0"
+  },
+  "dependencies": {
+    "@modules/auth": "workspace:*",
+    "@modules/api": "workspace:*",
+    "@modules/telemetry": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "require": "./index.ts",
+      "types": "./index.ts"
+    },
+    "./module.config": {
+      "import": "./module.config.ts",
+      "require": "./module.config.ts",
+      "types": "./module.config.ts"
+    }
+  }
+}

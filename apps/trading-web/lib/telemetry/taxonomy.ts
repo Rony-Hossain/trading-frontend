@@ -18,6 +18,10 @@ export enum TelemetryCategory {
   PERFORMANCE = 'performance',
   ERROR = 'error',
   USER_FEEDBACK = 'user_feedback',
+  RULES = 'rules',
+  EXPLORE = 'explore',
+  ML_INSIGHTS = 'ml_insights',
+  LEARN = 'learn',
 }
 
 // =============================================================================
@@ -249,6 +253,30 @@ export interface NavItemClickedEvent {
   nav_type: 'main_nav' | 'breadcrumb' | 'link'
 }
 
+export interface AlertToPortfolioNavigationEvent {
+  category: TelemetryCategory.NAVIGATION
+  action: 'alert_to_portfolio_nav'
+  alert_id: string
+  symbol: string
+  time_to_navigate_sec: number
+}
+
+export interface JournalCoverageViewedEvent {
+  category: TelemetryCategory.NAVIGATION
+  action: 'journal_coverage_viewed'
+  coverage_percentage: number
+  total_trades: number
+  trades_with_notes: number
+}
+
+export interface TradeModeIndicatorViewedEvent {
+  category: TelemetryCategory.NAVIGATION
+  action: 'trade_mode_indicator_viewed'
+  mode: 'paper' | 'live'
+  page: string
+  visibility: 'prominent' | 'subtle'
+}
+
 // =============================================================================
 // PERFORMANCE EVENTS
 // =============================================================================
@@ -336,6 +364,235 @@ export interface HelpfulnessRatedEvent {
 }
 
 // =============================================================================
+// RULES EVENTS (Phase 5)
+// =============================================================================
+
+export interface RuleSavedEvent {
+  category: TelemetryCategory.RULES
+  action: 'rule_saved'
+  build_duration_sec: number
+  condition_count: number
+  action_count: number
+}
+
+export interface RulePreviewedEvent {
+  category: TelemetryCategory.RULES
+  action: 'rule_previewed'
+  condition_count: number
+}
+
+export interface RulePreviewLoadedEvent {
+  category: TelemetryCategory.RULES
+  action: 'rule_preview_loaded'
+  symbol: string
+  total_triggers: number
+  win_rate: number
+}
+
+export interface RuleAcceptedFromPreviewEvent {
+  category: TelemetryCategory.RULES
+  action: 'rule_accepted_from_preview'
+  symbol: string
+  win_rate: number
+}
+
+export interface ConditionAddedEvent {
+  category: TelemetryCategory.RULES
+  action: 'condition_added'
+  condition_type: string
+}
+
+export interface GroupAddedEvent {
+  category: TelemetryCategory.RULES
+  action: 'group_added'
+}
+
+export interface ConditionDeletedEvent {
+  category: TelemetryCategory.RULES
+  action: 'condition_deleted'
+}
+
+export interface GroupDeletedEvent {
+  category: TelemetryCategory.RULES
+  action: 'group_deleted'
+}
+
+export interface RuleDeletedEvent {
+  category: TelemetryCategory.RULES
+  action: 'rule_deleted'
+  rule_id: string
+}
+
+export interface RuleToggledEvent {
+  category: TelemetryCategory.RULES
+  action: 'rule_toggled'
+  rule_id: string
+  enabled: boolean
+}
+
+export interface RuleDuplicatedEvent {
+  category: TelemetryCategory.RULES
+  action: 'rule_duplicated'
+  rule_id: string
+}
+
+export interface TemplateUsedEvent {
+  category: TelemetryCategory.RULES
+  action: 'template_used'
+  template_id: string
+  template_category: string
+}
+
+// =============================================================================
+// EXPLORE EVENTS (Phase 4)
+// =============================================================================
+
+export interface GlossaryViewedEvent {
+  category: TelemetryCategory.EXPLORE
+  action: 'glossary_viewed'
+  mode: 'beginner' | 'expert'
+  total_terms: number
+}
+
+export interface GlossaryTermSelectedEvent {
+  category: TelemetryCategory.EXPLORE
+  action: 'glossary_term_selected'
+  term: string
+  term_category: string
+  mode: 'beginner' | 'expert'
+}
+
+// =============================================================================
+// ML INSIGHTS EVENTS (Phase 6)
+// =============================================================================
+
+export interface DiagnosticsExpandedEvent {
+  category: TelemetryCategory.ML_INSIGHTS
+  action: 'diagnostics_expanded' | 'diagnostics_collapsed'
+  confidence: number
+  drift_status: 'green' | 'yellow' | 'red'
+}
+
+export interface DiagnosticsFeedbackEvent {
+  category: TelemetryCategory.ML_INSIGHTS
+  action: 'diagnostics_feedback'
+  helpful: boolean
+}
+
+export interface RegimeBannerViewedEvent {
+  category: TelemetryCategory.ML_INSIGHTS
+  action: 'regime_banner_viewed'
+  regime: string
+  confidence: number
+  recommendation_tone: 'aggressive' | 'moderate' | 'cautious'
+}
+
+export interface RegimeBannerDismissedEvent {
+  category: TelemetryCategory.ML_INSIGHTS
+  action: 'regime_banner_dismissed'
+  regime: string
+}
+
+export interface DriverClickedEvent {
+  category: TelemetryCategory.ML_INSIGHTS
+  action: 'driver_clicked'
+  driver_name: string
+  driver_category: string
+  contribution: number
+}
+
+export interface WhyNowPanelViewedEvent {
+  category: TelemetryCategory.ML_INSIGHTS
+  action: 'why_now_panel_viewed'
+  symbol: string
+  num_drivers: number
+}
+
+export interface InsightHelpfulEvent {
+  category: TelemetryCategory.ML_INSIGHTS
+  action: 'insight_helpful' | 'insight_confusing'
+  insight_type: 'driver' | 'regime' | 'diagnostics'
+}
+
+// =============================================================================
+// LEARN HUB EVENTS (Phase 7)
+// =============================================================================
+
+export interface LearnHubViewedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'hub_viewed'
+  lesson_count: number
+  mode: 'beginner' | 'expert'
+}
+
+export interface LessonStartedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'lesson_started'
+  lesson_id: string
+  lesson_title: string
+  difficulty: string
+  category: string
+}
+
+export interface LessonCompletedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'lesson_completed'
+  lesson_id: string
+  time_spent_seconds: number
+  quiz_score?: number
+}
+
+export interface LessonBlockViewedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'lesson_block_viewed'
+  lesson_id: string
+  block_index: number
+  block_type: string
+}
+
+export interface QuizAnsweredEvent {
+  category: TelemetryCategory.LEARN
+  action: 'quiz_answered'
+  lesson_id: string
+  question_id: string
+  correct: boolean
+}
+
+export interface GlossarySearchedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'glossary_searched'
+  query: string
+  result_count: number
+}
+
+export interface GlossaryTermViewedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'glossary_term_viewed'
+  term: string
+  source: 'search' | 'tooltip' | 'lesson'
+}
+
+export interface PathStartedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'path_started'
+  path_id: string
+  path_title: string
+}
+
+export interface ContinueLessonClickedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'continue_lesson_clicked'
+  lesson_id: string
+}
+
+export interface RecommendedLessonClickedEvent {
+  category: TelemetryCategory.LEARN
+  action: 'recommended_lesson_clicked'
+  lesson_id: string
+  reason: string
+}
+
+// =============================================================================
 // UNION TYPE OF ALL EVENTS
 // =============================================================================
 
@@ -365,6 +622,9 @@ export type TelemetryEvent =
   | SettingChangedEvent
   | PageViewedEvent
   | NavItemClickedEvent
+  | AlertToPortfolioNavigationEvent
+  | JournalCoverageViewedEvent
+  | TradeModeIndicatorViewedEvent
   | PerformanceMetricEvent
   | RealtimeThrottledEvent
   | BundleSizeEvent
@@ -374,6 +634,37 @@ export type TelemetryEvent =
   | TooltipOpenedEvent
   | FeedbackSubmittedEvent
   | HelpfulnessRatedEvent
+  | RuleSavedEvent
+  | RulePreviewedEvent
+  | RulePreviewLoadedEvent
+  | RuleAcceptedFromPreviewEvent
+  | ConditionAddedEvent
+  | GroupAddedEvent
+  | ConditionDeletedEvent
+  | GroupDeletedEvent
+  | RuleDeletedEvent
+  | RuleToggledEvent
+  | RuleDuplicatedEvent
+  | TemplateUsedEvent
+  | GlossaryViewedEvent
+  | GlossaryTermSelectedEvent
+  | DiagnosticsExpandedEvent
+  | DiagnosticsFeedbackEvent
+  | RegimeBannerViewedEvent
+  | RegimeBannerDismissedEvent
+  | DriverClickedEvent
+  | WhyNowPanelViewedEvent
+  | InsightHelpfulEvent
+  | LearnHubViewedEvent
+  | LessonStartedEvent
+  | LessonCompletedEvent
+  | LessonBlockViewedEvent
+  | QuizAnsweredEvent
+  | GlossarySearchedEvent
+  | GlossaryTermViewedEvent
+  | PathStartedEvent
+  | ContinueLessonClickedEvent
+  | RecommendedLessonClickedEvent
 
 // =============================================================================
 // TELEMETRY SERVICE

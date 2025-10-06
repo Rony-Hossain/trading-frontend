@@ -1,0 +1,16 @@
+{
+  "name": "@modules/learn",
+  "version": "1.0.0",
+  "description": "Educational content hub with lessons, learning paths, and glossary",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "keywords": [
+    "education",
+    "lessons",
+    "learning",
+    "glossary",
+    "training"
+  ],
+  "phase": 7
+}

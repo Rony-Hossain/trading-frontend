@@ -1,0 +1,51 @@
+{
+  "tenantId": "tenant-expert-001",
+  "tenantName": "Expert Trading Platform",
+  "defaultMode": "expert",
+  "allowModeSwitch": true,
+  "defaultRiskAppetite": "moderate",
+  "defaultDailyLossCap": 5.0,
+  "defaultMaxPositionSize": 10.0,
+  "features": {
+    "paperTradingEnabled": true,
+    "expertModeEnabled": true,
+    "newsIntegrationEnabled": true,
+    "advancedChartsEnabled": true,
+    "optionsTradingEnabled": true
+  },
+  "defaultRegion": "US",
+  "enforcementLevel": "advisory",
+  "defaultTheme": "dark",
+  "showBeginnerHints": false,
+  "modules": {
+    "today": true,
+    "portfolio": true,
+    "alerts": true,
+    "journal": true,
+    "settings": true,
+    "indicators": true,
+    "options": true,
+    "diagnostics": true,
+    "rules": false,
+    "mlInsights": true,
+    "learn": true,
+    "explore": true
+  },
+  "theme": {
+    "primary": "#2563eb",
+    "secondary": "#7c3aed",
+    "accent": "#f59e0b",
+    "success": "#10b981",
+    "warning": "#f59e0b",
+    "error": "#ef4444",
+    "info": "#3b82f6",
+    "bgPrimary": "#ffffff",
+    "bgSecondary": "#f9fafb",
+    "bgTertiary": "#f3f4f6",
+    "textPrimary": "#111827",
+    "textSecondary": "#6b7280",
+    "textMuted": "#9ca3af",
+    "border": "#e5e7eb",
+    "divider": "#d1d5db"
+  }
+}

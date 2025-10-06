@@ -1,0 +1,39 @@
+{
+  "name": "@modules/indicators",
+  "version": "1.0.0",
+  "description": "Advanced technical indicators with template persistence and validation",
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts",
+  "private": true,
+  "keywords": [
+    "trading",
+    "indicators",
+    "technical-analysis",
+    "expert",
+    "module"
+  ],
+  "author": "Trading Platform Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@modules/auth": "workspace:*",
+    "@modules/api": "workspace:*",
+    "@modules/telemetry": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "require": "./index.ts",
+      "types": "./index.ts"
+    },
+    "./module.config": {
+      "import": "./module.config.ts",
+      "require": "./module.config.ts",
+      "types": "./module.config.ts"
+    }
+  }
+}

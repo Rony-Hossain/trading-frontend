@@ -1,0 +1,22 @@
+{
+  "name": "@modules/rules",
+  "version": "1.0.0",
+  "description": "Rules Engine & Advanced Alerts module for trading platform",
+  "main": "index.ts",
+  "keywords": [
+    "rules",
+    "alerts",
+    "automation",
+    "trading",
+    "backtest"
+  ],
+  "dependencies": {
+    "@mui/material": "^5.0.0",
+    "@mui/icons-material": "^5.0.0",
+    "react": "^19.0.0"
+  },
+  "peerDependencies": {
+    "@/lib/types/contracts": "*",
+    "@/lib/telemetry/taxonomy": "*"
+  }
+}

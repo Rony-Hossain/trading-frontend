@@ -3,6 +3,69 @@
  * Reads configuration from environment or remote JSON
  */
 
+/**
+ * Theme tokens for tenant-level customization
+ * Phase 4: Expert Surfaces
+ */
+export interface ThemeTokens {
+  // Brand colors
+  primary: string
+  secondary: string
+  accent: string
+
+  // Semantic colors
+  success: string
+  warning: string
+  error: string
+  info: string
+
+  // Backgrounds
+  bgPrimary: string
+  bgSecondary: string
+  bgTertiary: string
+
+  // Text colors
+  textPrimary: string
+  textSecondary: string
+  textMuted: string
+
+  // Border and dividers
+  border: string
+  divider: string
+
+  // Custom CSS variables
+  customCss?: string
+}
+
+/**
+ * Module visibility and feature flags per tenant
+ */
+export interface ModuleVisibility {
+  // Core modules
+  today: boolean
+  portfolio: boolean
+  alerts: boolean
+  journal: boolean
+  settings: boolean
+
+  // Expert modules (Phase 4)
+  indicators: boolean
+  options: boolean
+  diagnostics: boolean
+
+  // Phase 5 modules
+  rules?: boolean
+
+  // Phase 6 modules
+  mlInsights?: boolean
+
+  // Phase 7 modules
+  learn?: boolean
+
+  // Future modules
+  explore?: boolean
+}
+
 export interface SiteConfig {
   // Mode defaults
   defaultMode: 'beginner' | 'expert'
@@ -39,6 +102,16 @@ export interface SiteConfig {
   sentryDsn?: string
   posthogKey?: string
   vercelAnalytics: boolean
+
+  // Theming (Phase 4)
+  theme?: ThemeTokens
+
+  // Module visibility (Phase 4)
+  modules: ModuleVisibility
+
+  // Tenant identification
+  tenantId?: string
+  tenantName?: string
 }
 
 /**
@@ -80,6 +153,33 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   posthogKey: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   vercelAnalytics: process.env.NEXT_PUBLIC_VERCEL_ANALYTICS === 'true',
+
+  // Module visibility (Phase 4)
+  modules: {
+    // Core modules (always enabled by default)
+    today: true,
+    portfolio: true,
+    alerts: true,
+    journal: true,
+    settings: true,
+
+    // Expert modules (disabled by default, enable per tenant)
+    indicators: false,
+    options: false,
+    diagnostics: false,
+
+    // Phase 5 modules
+    rules: false,
+
+    // Phase 6 modules
+    mlInsights: false,
+
+    // Phase 7 modules
+    learn: false,
+
+    // Future modules
+    explore: false,
+  },
 }
 
 /**
@@ -156,6 +256,11 @@ function mergeConfigs(...configs: Partial<SiteConfig>[]): SiteConfig {
         ...merged.features,
         ...(config.features || {}),
       },
+      modules: {
+        ...merged.modules,
+        ...(config.modules || {}),
+      },
+      theme: config.theme || merged.theme,
     }),
     DEFAULT_SITE_CONFIG
   ) as SiteConfig
