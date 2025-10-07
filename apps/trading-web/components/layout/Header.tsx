@@ -29,7 +29,7 @@ import {
   Brightness7,
   Dashboard as DashboardIcon,
 } from '@mui/icons-material'
-import { useUserStore } from '@/lib/stores/userStore'
+import { useUserStore } from '../../lib/stores/userStore'
 import Link from 'next/link'
 
 interface HeaderProps {

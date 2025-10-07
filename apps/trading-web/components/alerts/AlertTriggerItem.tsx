@@ -28,9 +28,12 @@ import {
   ThumbDown,
 } from '@mui/icons-material'
 import { getCopy } from '@/lib/copy/copy-service'
-import { trackEvent } from '@/lib/telemetry/taxonomy'
+import { TelemetryCategory, trackEvent } from '@/lib/telemetry/taxonomy'
 import { useAlertsUiStore } from '@/lib/stores/useAlertsUiStore'
 import type { Alert, AlertType } from '@/lib/types/contracts'
+import { launchKpiTracker } from '@/lib/analytics/launch-kpi-tracker'
+import { experimentEngine, type ExperimentDefinition } from '@/lib/experiments/experiment-engine'
+import { useExperiment } from '@/hooks/useExperiment'
 
 export interface AlertTriggerItemProps {
   alert: Alert
@@ -54,7 +57,19 @@ const ALERT_TYPE_CONFIG: Record<
   },
 }
 
+const ALERT_TONE_EXPERIMENT: ExperimentDefinition = {
+  id: 'alert-tone',
+  rolloutPercentage: 20,
+  stopRule: {
+    metric: 'follow_through_rate',
+    threshold: 0.3,
+    comparator: 'lt',
+    sampleSize: 50,
+  },
+}
+
 export function AlertTriggerItem({ alert, onAction, mode = 'beginner' }: AlertTriggerItemProps) {
+  const { cohort: alertCohort, refresh: refreshAlertCohort } = useExperiment(ALERT_TONE_EXPERIMENT)
   const [expanded, setExpanded] = useState(false)
   const [actionTaken, setActionTaken] = useState<string | null>(null)
   const [feedbackGiven, setFeedbackGiven] = useState(false)
@@ -65,36 +80,60 @@ export function AlertTriggerItem({ alert, onAction, mode = 'beginner' }: AlertTr
   const expiresInMin = Math.floor(expiresIn / 60000)
   const isExpiringSoon = expiresInMin < 5
   const isSuppressed = alert.throttle.suppressed
+  const alertMessage =
+    alertCohort === 'canary'
+      ? `${alert.message} ${getCopy('alerts.canary_prompt', mode)}`
+      : alert.message
 
   const handleAction = (action: string) => {
     setActionTaken(action)
     onAction(action)
 
+    if (action === 'buy_now' || action === 'sell_now' || action === 'snooze') {
+      launchKpiTracker.recordAlertAction(action as 'buy_now' | 'sell_now' | 'snooze')
+    }
+    if (action === 'buy_now' || action === 'sell_now') {
+      launchKpiTracker.recordAlertFollowThrough(alert.analytics?.expected_pnl_usd)
+    }
+
+    const timeSinceReceivedSec = Math.max(
+      0,
+      Math.round((Date.now() - new Date(alert.created_at).getTime()) / 1000)
+    )
+
     trackEvent({
-      category: 'Alerts',
-      action: 'alert_action',
-      label: action,
-      metadata: {
-        alert_id: alert.id,
-        alert_type: alert.type,
-        symbol: alert.symbol,
-        action,
-      },
+      category: TelemetryCategory.ALERTS,
+      action: 'alert_action_taken',
+      alert_id: alert.id,
+      chosen_action: action as 'buy_now' | 'sell_now' | 'snooze',
+      time_to_action_sec: timeSinceReceivedSec,
     })
+
+    if (alertCohort === 'canary' || alertCohort === 'control') {
+      const followThroughValue = action === 'buy_now' || action === 'sell_now' ? 1 : 0
+      experimentEngine.recordMetric(ALERT_TONE_EXPERIMENT.id, 'follow_through_rate', followThroughValue)
+      if (alertCohort === 'canary' && experimentEngine.shouldStop(ALERT_TONE_EXPERIMENT.id)) {
+        console.warn('[Experiment] Stop rule triggered for alert-tone canary cohort. Rolling back to control.')
+        experimentEngine.clearAssignment(ALERT_TONE_EXPERIMENT.id)
+        refreshAlertCohort()
+      }
+    }
   }
 
   const handleExpand = () => {
     setExpanded(!expanded)
 
     if (!expanded) {
+      const timeSinceReceivedSec = Math.max(
+        0,
+        Math.round((Date.now() - new Date(alert.created_at).getTime()) / 1000)
+      )
       trackEvent({
-        category: 'Alerts',
-        action: 'alert_expand',
-        label: alert.type,
-        metadata: {
-          alert_id: alert.id,
-          symbol: alert.symbol,
-        },
+        category: TelemetryCategory.ALERTS,
+        action: 'alert_clicked',
+        alert_id: alert.id,
+        alert_type: alert.type,
+        time_since_received_sec: timeSinceReceivedSec,
       })
     }
   }
@@ -102,18 +141,16 @@ export function AlertTriggerItem({ alert, onAction, mode = 'beginner' }: AlertTr
   const handleFeedback = (helpful: boolean) => {
     setFeedbackGiven(true)
     setFeedback(alert.id, helpful)
+    launchKpiTracker.recordAlertFeedback(helpful)
 
     trackEvent({
-      category: 'Alerts',
+      category: TelemetryCategory.ALERTS,
       action: 'alert_feedback',
-      label: helpful ? 'helpful' : 'not_helpful',
-      metadata: {
-        alert_id: alert.id,
-        alert_type: alert.type,
-        symbol: alert.symbol,
-        helpful,
-      },
+      alert_id: alert.id,
+      helpful,
     })
+
+    experimentEngine.recordMetric(ALERT_TONE_EXPERIMENT.id, 'helpfulness_pct', helpful ? 1 : 0)
   }
 
   return (
@@ -154,7 +191,7 @@ export function AlertTriggerItem({ alert, onAction, mode = 'beginner' }: AlertTr
             </Box>
 
             <Typography variant="body2" color="text.secondary">
-              {alert.message}
+              {alertMessage}
             </Typography>
           </Box>
 
@@ -246,20 +283,14 @@ export function AlertTriggerItem({ alert, onAction, mode = 'beginner' }: AlertTr
             {!feedbackGiven && (
               <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
                 <Typography variant="caption" gutterBottom display="block">
-                  {mode === 'beginner' ? 'Was this notification helpful?' : 'Alert feedback'}
+                  {getCopy('feedback.prompt', mode)}
                 </Typography>
                 <ButtonGroup size="small" sx={{ mt: 1 }}>
-                  <Button
-                    startIcon={<ThumbUp />}
-                    onClick={() => handleFeedback(true)}
-                  >
-                    {mode === 'beginner' ? 'Yes' : 'Helpful'}
+                  <Button startIcon={<ThumbUp />} onClick={() => handleFeedback(true)}>
+                    {getCopy('feedback.yes', mode)}
                   </Button>
-                  <Button
-                    startIcon={<ThumbDown />}
-                    onClick={() => handleFeedback(false)}
-                  >
-                    {mode === 'beginner' ? 'No' : 'Not Helpful'}
+                  <Button startIcon={<ThumbDown />} onClick={() => handleFeedback(false)}>
+                    {getCopy('feedback.no', mode)}
                   </Button>
                 </ButtonGroup>
               </Box>
@@ -268,9 +299,7 @@ export function AlertTriggerItem({ alert, onAction, mode = 'beginner' }: AlertTr
             {feedbackGiven && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="caption" color="text.secondary">
-                  {mode === 'beginner'
-                    ? 'Thanks for your feedback!'
-                    : 'Feedback recorded'}
+                  {getCopy('feedback.thanks', mode)}
                 </Typography>
               </Box>
             )}

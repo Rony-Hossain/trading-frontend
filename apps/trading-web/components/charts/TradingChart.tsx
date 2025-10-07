@@ -26,10 +26,9 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material'
 import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts'
-import { useUserStore } from '@/lib/stores/userStore'
-import { useChartStore, ChartType } from '@/lib/stores/chartStore'
-import { THEME_PRESETS } from '@/lib/stores/userStore'
-import { getChartTheme, getCandlestickColors } from '@/lib/theme/themeConfig'
+import { useUserStore, THEME_PRESETS } from '../../lib/stores/userStore'
+import { useChartStore, ChartType } from '../../lib/stores/chartStore'
+import { getChartTheme, getCandlestickColors } from '../../lib/theme/themeConfig'
 
 interface TradingChartProps {
   chartId: string

@@ -34,7 +34,7 @@ import {
   Storage as DataIcon,
   TuneRounded as AdvancedIcon,
 } from '@mui/icons-material'
-import { useUserStore, THEME_PRESETS } from '@/lib/stores/userStore'
+import { useUserStore, THEME_PRESETS } from '../../lib/stores/userStore'
 import { ExpertModuleToggles } from '@/components/settings/ExpertModuleToggles'
 import { trackEvent, TelemetryCategory } from '@/lib/telemetry/taxonomy'
 import { useEffect, useState as useReactState } from 'react'

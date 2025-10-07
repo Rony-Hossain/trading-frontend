@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "generated_at": "2025-10-05T14:32:00Z",
+    "environment": "staging"
+  },
+  "mode": "beginner",
+  "daily_cap": {
+    "max_loss_usd": 500,
+    "used_usd": 120,
+    "status": "ok",
+    "reset_at": "2025-10-06T00:00:00Z"
+  },
+  "picks": [
+    {
+      "symbol": "AAPL",
+      "action": "BUY",
+      "shares": 10,
+      "entry_hint": 181.24,
+      "safety_line": 172.5,
+      "confidence": "high",
+      "reason": "Momentum improving with bullish earnings outlook.",
+      "reason_codes": ["momentum", "earnings_sentiment"],
+      "max_risk_usd": 150,
+      "budget_impact": { "cash_left": 3500 },
+      "constraints": {
+        "leverage_allowed": false,
+        "options_allowed": false
+      },
+      "limits_applied": {
+        "position_size_pct": 5,
+        "max_positions_reached": false
+      },
+      "compliance": {
+        "region": "US",
+        "disclosures": ["pattern_day_trader"]
+      },
+      "decision_path": "ALPHA>THRESH>RISK_OK>SENTIMENT_OK",
+      "reason_score": 0.86,
+      "news": [
+        {
+          "id": "news-1",
+          "symbols": ["AAPL"],
+          "headline": "Apple announces new Mac lineup with AI features",
+          "summary": "Apple introduced a refreshed Mac lineup powered by the new M5 chip.",
+          "source": "Reuters",
+          "url": "https://example.com/news/apple-ai",
+          "publishedAt": "2025-10-05T13:50:00Z",
+          "sentiment": "positive",
+          "importance": "high",
+          "eventType": "product_launch"
+        }
+      ]
+    }
+  ]
+}

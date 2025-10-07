@@ -4,6 +4,7 @@
  */
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { launchKpiTracker } from '@/lib/analytics/launch-kpi-tracker'
 
 export type ThemeMode = 'light' | 'dark' | 'auto'
 export type DashboardMode = 'beginner' | 'expert'
@@ -99,6 +100,7 @@ export interface UserPreferences {
   defaultSymbol: string
   autoRefresh: boolean
   refreshInterval: number // seconds
+  deviceSyncVersion?: string
 
   // Appearance
   themeMode: ThemeMode
@@ -130,6 +132,8 @@ export interface UserPreferences {
   dataProvider: string
   showExtendedHours: boolean
   showVolume: boolean
+  preferredNewsSources: string[]
+  hiddenNewsSources: string[]
 
   // Advanced
   enableHotkeys: boolean
@@ -163,6 +167,9 @@ interface UserState {
   setThemePreset: (preset: string) => void
   setDashboardMode: (mode: DashboardMode) => void
   toggleDashboardMode: () => void
+  hideNewsSource: (source: string) => void
+  unhideNewsSource: (source: string) => void
+  resetHiddenSources: () => void
 }
 
 const defaultPreferences: UserPreferences = {
@@ -171,6 +178,7 @@ const defaultPreferences: UserPreferences = {
   defaultSymbol: 'AAPL',
   autoRefresh: true,
   refreshInterval: 5,
+  deviceSyncVersion: '1.0.0',
 
   // Appearance
   themeMode: 'dark',
@@ -201,6 +209,8 @@ const defaultPreferences: UserPreferences = {
   dataProvider: 'default',
   showExtendedHours: false,
   showVolume: true,
+  preferredNewsSources: ['Bloomberg', 'Reuters', 'CNBC'],
+  hiddenNewsSources: [],
 
   // Advanced
   enableHotkeys: true,
@@ -243,17 +253,46 @@ export const useUserStore = create<UserState>()(
           preferences: { ...state.preferences, themePreset: preset },
         })),
 
-      setDashboardMode: (mode) =>
+      setDashboardMode: (mode) => {
+        launchKpiTracker.recordModeChange(mode)
         set((state) => ({
           preferences: { ...state.preferences, dashboardMode: mode },
-        })),
+        }))
+      },
 
       toggleDashboardMode: () =>
+        set((state) => {
+          const nextMode = state.preferences.dashboardMode === 'beginner' ? 'expert' : 'beginner'
+          launchKpiTracker.recordModeChange(nextMode)
+          return {
+            preferences: {
+              ...state.preferences,
+              dashboardMode: nextMode,
+            },
+          }
+        }),
+
+      hideNewsSource: (source: string) =>
         set((state) => ({
           preferences: {
             ...state.preferences,
-            dashboardMode: state.preferences.dashboardMode === 'beginner' ? 'expert' : 'beginner',
+            hiddenNewsSources: Array.from(
+              new Set([...state.preferences.hiddenNewsSources, source])
+            ),
           },
+        })),
+
+      unhideNewsSource: (source: string) =>
+        set((state) => ({
+          preferences: {
+            ...state.preferences,
+            hiddenNewsSources: state.preferences.hiddenNewsSources.filter((s) => s !== source),
+          },
+        })),
+
+      resetHiddenSources: () =>
+        set((state) => ({
+          preferences: { ...state.preferences, hiddenNewsSources: [] },
         })),
     }),
     {

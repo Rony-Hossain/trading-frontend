@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { Box, Container, Grid, Paper, TextField, Button, Typography, ToggleButtonGroup, ToggleButton } from '@mui/material'
-import { StockChart } from '../StockChart'
+import dynamic from 'next/dynamic'
 import RealTimeAlerts from './RealTimeAlerts'
 import OptionsGreeks from './OptionsGreeks'
 import OptionsAnalysis from '../options/OptionsAnalysis'
@@ -48,7 +48,7 @@ export default function DayTradingDashboard({ defaultSymbol = 'AAPL' }: Props) {
                   <ToggleButton value="1y">Year</ToggleButton>
                 </ToggleButtonGroup>
               </Paper>
-              <StockChart symbol={symbol} period={period} height={400} />
+              <StockChart symbol={symbol} period={period} height={400} mode="expert" />
             </Box>
           </Grid>
           <Grid item xs={12} md={4}>
@@ -64,3 +64,9 @@ export default function DayTradingDashboard({ defaultSymbol = 'AAPL' }: Props) {
     </Box>
   )
 }
+const StockChart = dynamic(() => import('../StockChart').then((mod) => mod.StockChart), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full animate-pulse rounded-xl bg-gray-100" />
+  ),
+})

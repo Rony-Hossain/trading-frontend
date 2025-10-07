@@ -93,6 +93,7 @@ export interface Pick {
   decision_path: string // "ALPHA>THRESH>RISK_OK>SENTIMENT_OK"
   drivers?: Driver[] // Expert mode only
   reason_score: number // Quality score 0-1
+  news?: NewsItem[]
 }
 
 export type DailyCapStatus = 'ok' | 'warning' | 'hit'
@@ -153,6 +154,12 @@ export interface AlertSafety {
 export type AlertType = 'opportunity' | 'protect'
 export type AlertAction = 'buy_now' | 'sell_now' | 'snooze'
 
+export interface AlertAnalytics {
+  expected_pnl_usd?: number
+  follow_through_rate?: number
+  helpfulness_pct?: number
+}
+
 export interface Alert {
   id: string // ULID
   type: AlertType
@@ -164,6 +171,7 @@ export interface Alert {
   paper_trade_only: boolean
   expires_at: string // ISO 8601
   created_at: string // ISO 8601
+  analytics?: AlertAnalytics
 }
 
 export interface AlertsResponse {

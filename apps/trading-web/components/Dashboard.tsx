@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { StockPrice } from './StockPrice'
-import { StockChart } from './StockChart'
 import { TechnicalAnalysis } from './TechnicalAnalysis'
 import { TechnicalIndicators } from './TechnicalIndicators'
 import { Portfolio } from './Portfolio'
@@ -14,6 +14,13 @@ import { marketDataAPI } from '../lib/api'
 import { Search, Star, TrendingUp, Activity, BarChart3, LineChart, Briefcase, Bell, Zap, User, LogOut, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { UserProfile } from './auth/UserProfile'
+
+const StockChart = dynamic(() => import('./StockChart').then((mod) => mod.StockChart), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full animate-pulse rounded-xl bg-gray-100" />
+  ),
+})
 
 interface DashboardProps {
   defaultSymbol?: string

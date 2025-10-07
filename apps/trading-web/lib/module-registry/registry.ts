@@ -15,6 +15,13 @@ class ModuleRegistry implements IModuleRegistry {
   private modules = new Map<string, ModuleConfig>()
   private enabledModules = new Set<string>()
 
+  private buildDisabledModules = new Set(
+    (process.env.NEXT_PUBLIC_DISABLED_MODULES || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )
+
   /**
    * Register a module
    */
@@ -194,6 +201,10 @@ class ModuleRegistry implements IModuleRegistry {
       ) {
         return false
       }
+    }
+
+    if (this.buildDisabledModules.has(config.id)) {
+      return false
     }
 
     return true

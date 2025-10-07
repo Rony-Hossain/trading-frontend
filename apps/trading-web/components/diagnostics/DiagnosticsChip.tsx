@@ -7,8 +7,21 @@
  */
 
 import { useState } from 'react'
-import { Activity, AlertTriangle, TrendingUp, ChevronDown, Info, TrendingDown, Minus } from 'lucide-react'
+import {
+  Activity,
+  AlertTriangle,
+  TrendingUp,
+  ChevronDown,
+  Info,
+  TrendingDown,
+  Minus,
+  ThumbsUp,
+  ThumbsDown,
+} from 'lucide-react'
 import type { DiagnosticsSummary, MLDriver } from '@/lib/types/contracts'
+import { getCopy } from '@/lib/copy/copy-service'
+import { useExperiment } from '@/hooks/useExperiment'
+import { experimentEngine, type ExperimentDefinition } from '@/lib/experiments/experiment-engine'
 import { trackEvent, TelemetryCategory } from '@/lib/telemetry/taxonomy'
 
 interface DiagnosticsChipProps {
@@ -17,16 +30,40 @@ interface DiagnosticsChipProps {
   onFeedback?: (helpful: boolean) => void
 }
 
+const DRIVER_DETAIL_EXPERIMENT: ExperimentDefinition = {
+  id: 'driver-detail-depth',
+  rolloutPercentage: 50,
+  stopRule: {
+    metric: 'driver_helpfulness',
+    threshold: 0.4,
+    comparator: 'lt',
+    sampleSize: 30,
+  },
+}
+
+const DRIVER_VISIBILITY_EXPERIMENT: ExperimentDefinition = {
+  id: 'driver-visibility',
+  rolloutPercentage: 50,
+}
+
 export function DiagnosticsChip({
   diagnostics,
   mode = 'beginner',
   onFeedback,
 }: DiagnosticsChipProps) {
+  const { cohort: driverDetailCohort, refresh: refreshDriverDetail } = useExperiment(
+    DRIVER_DETAIL_EXPERIMENT
+  )
+  const { cohort: driverVisibilityCohort, refresh: refreshDriverVisibility } = useExperiment(
+    DRIVER_VISIBILITY_EXPERIMENT
+  )
   const [isExpanded, setIsExpanded] = useState(false)
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [driverFeedback, setDriverFeedback] = useState<Record<string, boolean>>({})
 
   const { model_confidence, drift_status, top_drivers, confidence_stability } = diagnostics
   const driftDetected = drift_status === 'yellow' || drift_status === 'red'
+  const driverLimit = driverVisibilityCohort === 'canary' ? 5 : 3
 
   const handleExpand = () => {
     setIsExpanded(!isExpanded)
@@ -55,6 +92,36 @@ export function DiagnosticsChip({
       action: helpful ? 'insight_helpful' : 'insight_confusing',
       insight_type: 'diagnostics',
     })
+  }
+
+  const handleDriverFeedback = (driver: MLDriver, helpful: boolean) => {
+    setDriverFeedback((prev) => ({ ...prev, [driver.name]: helpful }))
+
+    trackEvent({
+      category: TelemetryCategory.ML_INSIGHTS,
+      action: helpful ? 'insight_helpful' : 'insight_confusing',
+      insight_type: 'driver',
+      driver_name: driver.name,
+      driver_category: driver.category,
+      contribution: driver.contribution,
+    })
+
+    experimentEngine.recordMetric(
+      DRIVER_DETAIL_EXPERIMENT.id,
+      'driver_helpfulness',
+      helpful ? 1 : 0
+    )
+
+    if (
+      driverDetailCohort === 'canary' &&
+      experimentEngine.shouldStop(DRIVER_DETAIL_EXPERIMENT.id)
+    ) {
+      console.warn(
+        '[Experiment] Stop rule triggered for driver detail depth. Rolling back to control cohort.'
+      )
+      experimentEngine.clearAssignment(DRIVER_DETAIL_EXPERIMENT.id)
+      refreshDriverDetail()
+    }
   }
 
   const getConfidenceColor = () => {
@@ -217,7 +284,7 @@ export function DiagnosticsChip({
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {top_drivers.slice(0, 3).map((driver, idx) => (
+                  {top_drivers.slice(0, driverLimit).map((driver, idx) => (
                     <div key={idx}>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-gray-900 dark:text-white">
@@ -236,17 +303,52 @@ export function DiagnosticsChip({
                           )}
                         </div>
                       </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mt-1">
-                        <div
-                          className="h-1 rounded-full bg-blue-600"
-                          style={{ width: `${driver.contribution * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mt-1">
+                    <div
+                      className="h-1 rounded-full bg-blue-600"
+                      style={{ width: `${driver.contribution * 100}%` }}
+                    />
+                  </div>
+                  {driverDetailCohort === 'canary' && (
+                    <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+                      {driver.category} • trend {driver.trend_direction ?? 'neutral'} • timeframe {driver.timeframe}
+                    </p>
+                  )}
+                  <div className="mt-2 flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleDriverFeedback(driver, true)}
+                      disabled={driverFeedback[driver.name] === true}
+                      aria-label={`${getCopy('feedback.yes', mode)} driver ${driver.name}`}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-colors ${
+                        driverFeedback[driver.name] === true
+                          ? 'border-green-500 bg-green-50 text-green-600 dark:bg-green-900/20'
+                          : 'border-gray-300 text-gray-600 hover:border-green-500 hover:text-green-600'
+                      }`}
+                    >
+                      <ThumbsUp className="h-3 w-3" />
+                      {getCopy('feedback.yes', mode)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDriverFeedback(driver, false)}
+                      disabled={driverFeedback[driver.name] === false}
+                      aria-label={`${getCopy('feedback.no', mode)} driver ${driver.name}`}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-colors ${
+                        driverFeedback[driver.name] === false
+                          ? 'border-red-500 bg-red-50 text-red-600 dark:bg-red-900/20'
+                          : 'border-gray-300 text-gray-600 hover:border-red-500 hover:text-red-600'
+                      }`}
+                    >
+                      <ThumbsDown className="h-3 w-3" />
+                      {getCopy('feedback.no', mode)}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
+        )}
 
             {/* Info Link */}
             {mode === 'expert' && (

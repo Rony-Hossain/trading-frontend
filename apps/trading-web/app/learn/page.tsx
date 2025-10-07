@@ -8,13 +8,14 @@
 import { useState, useEffect } from 'react'
 import { Search, Book, Clock, Award, Play, CheckCircle, Circle } from 'lucide-react'
 import type { Lesson, LearningPath, LessonProgress, RecommendedLesson } from '@/lib/types/contracts'
-import { useUserStore } from '@/lib/stores/userStore'
+import { useUserStore } from '../../lib/stores/userStore'
 import { trackEvent, TelemetryCategory } from '@/lib/telemetry/taxonomy'
 import { LessonCard } from '@/components/learn/LessonCard'
 import { PathCard } from '@/components/learn/PathCard'
 import { ContinueBanner } from '@/components/learn/ContinueBanner'
 import { GlossarySearch } from '@/components/learn/GlossarySearch'
 import { MOCK_LESSONS, MOCK_PATHS, MOCK_PROGRESS, getMockRecommended } from '@/lib/data/mock-lessons'
+import ModuleGuard from '@/components/security/ModuleGuard'
 
 export default function LearnHubPage() {
   const { preferences } = useUserStore()
@@ -91,7 +92,8 @@ export default function LearnHubPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <ModuleGuard moduleId="learn" mode={mode}>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -227,6 +229,6 @@ export default function LearnHubPage() {
           )}
         </div>
       </div>
-    </div>
+    </ModuleGuard>
   )
 }

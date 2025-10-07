@@ -1,0 +1,25 @@
+{
+  "id": "alert-xyz",
+  "type": "opportunity",
+  "symbol": "TSLA",
+  "message": "Momentum breakout above resistance.",
+  "actions": ["buy_now", "snooze"],
+  "safety": {
+    "max_loss_usd": 220,
+    "estimated_slippage_bps": 12,
+    "execution_confidence": 0.78
+  },
+  "throttle": {
+    "cooldown_sec": 900,
+    "dedupe_key": "TSLA-opportunity",
+    "suppressed": false
+  },
+  "paper_trade_only": false,
+  "expires_at": "2025-10-05T15:05:00Z",
+  "created_at": "2025-10-05T14:55:00Z",
+  "analytics": {
+    "expected_pnl_usd": 180,
+    "follow_through_rate": 0.42,
+    "helpfulness_pct": 0.68
+  }
+}

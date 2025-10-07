@@ -1,4 +1,7 @@
 import axios from 'axios'
+import { REALTIME_BUDGETS } from '@/lib/performance/budgets'
+import { trackEvent, TelemetryCategory } from '@/lib/telemetry/taxonomy'
+import { notifyRateLimitHit, clearRateLimit } from '@/lib/network/status'
 
 // API Configuration
 const MARKET_DATA_API = process.env.NEXT_PUBLIC_MARKET_DATA_API || 'http://localhost:8002'
@@ -14,6 +17,59 @@ const analysisClient = axios.create({
   baseURL: ANALYSIS_API,
   timeout: 30000,
 })
+
+function parseRetryAfter(header?: string | null): Date | undefined {
+  if (!header) return undefined
+  const numeric = Number(header)
+  if (!Number.isNaN(numeric)) {
+    return new Date(Date.now() + numeric * 1000)
+  }
+  const date = new Date(header)
+  if (!Number.isNaN(date.getTime())) {
+    return date
+  }
+  return undefined
+}
+
+marketDataClient.interceptors.response.use(
+  (response) => {
+    clearRateLimit('market-data')
+    return response
+  },
+  (error) => {
+    if (error?.response?.status === 429) {
+      const headers = error.response.headers || {}
+      notifyRateLimitHit({
+        source: 'market-data',
+        retryAt: parseRetryAfter(headers['retry-after'] ?? headers['Retry-After']),
+        limit: Number(headers['x-ratelimit-limit']) || undefined,
+        remaining: Number(headers['x-ratelimit-remaining']) || undefined,
+        message: error.response.data?.message,
+      })
+    }
+    return Promise.reject(error)
+  }
+)
+
+analysisClient.interceptors.response.use(
+  (response) => {
+    clearRateLimit('analysis')
+    return response
+  },
+  (error) => {
+    if (error?.response?.status === 429) {
+      const headers = error.response.headers || {}
+      notifyRateLimitHit({
+        source: 'analysis',
+        retryAt: parseRetryAfter(headers['retry-after'] ?? headers['Retry-After']),
+        limit: Number(headers['x-ratelimit-limit']) || undefined,
+        remaining: Number(headers['x-ratelimit-remaining']) || undefined,
+        message: error.response.data?.message,
+      })
+    }
+    return Promise.reject(error)
+  }
+)
 
 // Types
 export interface StockPrice {
@@ -212,9 +268,28 @@ export const analysisAPI = {
   }
 }
 
+type RealtimeCallback = (data: StockPrice) => void
+type TimeoutHandle = ReturnType<typeof setTimeout>
+
+export interface RealtimeSubscriptionOptions {
+  mode?: 'beginner' | 'expert'
+  throttleMs?: number
+  dropStrategy?: 'drop-oldest' | 'drop-latest'
+}
+
+interface SubscriptionState {
+  options: Required<Pick<RealtimeSubscriptionOptions, 'mode' | 'throttleMs' | 'dropStrategy'>>
+  lastEmit: number
+  pending: StockPrice | null
+  timeout: TimeoutHandle | null
+  dropped: number
+  reported: boolean
+}
+
 // WebSocket for real-time updates
 export class RealTimeData {
-  private subscribers: Map<string, Set<(data: StockPrice) => void>> = new Map()
+  private subscribers: Map<string, Set<RealtimeCallback>> = new Map()
+  private subscriberState: Map<string, Map<RealtimeCallback, SubscriptionState>> = new Map()
   private sockets: Map<string, WebSocket> = new Map()
   private pollers: Map<string, any> = new Map()
 
@@ -224,9 +299,29 @@ export class RealTimeData {
     return `${wsBase}/ws/${encodeURIComponent(symbol)}`
   }
 
-  subscribe(symbol: string, callback: (data: StockPrice) => void) {
-    if (!this.subscribers.has(symbol)) this.subscribers.set(symbol, new Set())
+  subscribe(symbol: string, callback: RealtimeCallback, options: RealtimeSubscriptionOptions = {}) {
+    if (!this.subscribers.has(symbol)) {
+      this.subscribers.set(symbol, new Set())
+    }
     this.subscribers.get(symbol)!.add(callback)
+
+    if (!this.subscriberState.has(symbol)) {
+      this.subscriberState.set(symbol, new Map())
+    }
+
+    const mode = options.mode ?? 'beginner'
+    const budgets = REALTIME_BUDGETS[mode]
+    const throttleMs = options.throttleMs ?? budgets.max_update_rate_ms
+    const dropStrategy = options.dropStrategy ?? 'drop-oldest'
+
+    this.subscriberState.get(symbol)!.set(callback, {
+      options: { mode, throttleMs, dropStrategy },
+      lastEmit: 0,
+      pending: null,
+      timeout: null,
+      dropped: 0,
+      reported: false,
+    })
 
     if (this.sockets.has(symbol) || this.pollers.has(symbol)) return
 
@@ -238,8 +333,7 @@ export class RealTimeData {
       ws.onmessage = (evt) => {
         try {
           const data = JSON.parse(evt.data)
-          const callbacks = this.subscribers.get(symbol)
-          callbacks?.forEach(cb => cb(data))
+          this.dispatchTick(symbol, data)
         } catch {}
       }
       ws.onerror = () => {
@@ -256,10 +350,94 @@ export class RealTimeData {
     }
   }
 
-  unsubscribe(symbol: string, callback: (data: StockPrice) => void) {
+  private dispatchTick(symbol: string, data: StockPrice) {
+    const callbacks = this.subscribers.get(symbol)
+    if (!callbacks) return
+    callbacks.forEach((callback) => this.emitToSubscriber(symbol, callback, data))
+  }
+
+  private emitToSubscriber(symbol: string, callback: RealtimeCallback, data: StockPrice) {
+    const state = this.subscriberState.get(symbol)?.get(callback)
+    if (!state) {
+      callback(data)
+      return
+    }
+
+    const now = Date.now()
+    const elapsed = now - state.lastEmit
+
+    if (elapsed >= state.options.throttleMs) {
+      this.flushNow(symbol, callback, data, state, now)
+      return
+    }
+
+    // Apply backpressure policy: keep latest tick and drop older ones
+    if (state.options.dropStrategy === 'drop-oldest') {
+      state.pending = data
+    } else if (!state.pending) {
+      state.pending = data
+    }
+
+    state.dropped += 1
+    if (!state.reported) {
+      trackEvent({
+        category: TelemetryCategory.PERFORMANCE,
+        action: 'realtime_throttled',
+        max_points_exceeded: false,
+        update_rate_ms: state.options.throttleMs,
+        dropped_updates: state.dropped,
+      })
+      state.reported = true
+    }
+
+    if (!state.timeout) {
+      const delay = Math.max(0, state.options.throttleMs - elapsed)
+      state.timeout = setTimeout(() => this.flushPending(symbol, callback), delay)
+    }
+  }
+
+  private flushPending(symbol: string, callback: RealtimeCallback) {
+    const state = this.subscriberState.get(symbol)?.get(callback)
+    if (!state) return
+
+    const pending = state.pending
+    state.timeout = null
+    state.pending = null
+    if (!pending) return
+
+    this.flushNow(symbol, callback, pending, state, Date.now())
+  }
+
+  private flushNow(
+    symbol: string,
+    callback: RealtimeCallback,
+    data: StockPrice,
+    state: SubscriptionState,
+    timestamp: number
+  ) {
+    state.lastEmit = timestamp
+    if (state.timeout) {
+      clearTimeout(state.timeout)
+      state.timeout = null
+    }
+    state.pending = null
+    callback(data)
+  }
+
+  unsubscribe(symbol: string, callback: RealtimeCallback) {
     const set = this.subscribers.get(symbol)
     if (!set) return
     set.delete(callback)
+
+    const stateMap = this.subscriberState.get(symbol)
+    const state = stateMap?.get(callback)
+    if (state) {
+      if (state.timeout) {
+        clearTimeout(state.timeout)
+      }
+      stateMap?.delete(callback)
+    }
+
     if (set.size === 0) {
       const ws = this.sockets.get(symbol)
       if (ws) {
@@ -271,6 +449,10 @@ export class RealTimeData {
         clearInterval(poll)
         this.pollers.delete(symbol)
       }
+      if (stateMap) {
+        stateMap.clear()
+        this.subscriberState.delete(symbol)
+      }
     }
   }
 
@@ -279,8 +461,7 @@ export class RealTimeData {
     const pollInterval = setInterval(async () => {
       try {
         const data = await marketDataAPI.getStockPrice(symbol)
-        const callbacks = this.subscribers.get(symbol)
-        callbacks?.forEach(callback => callback(data))
+        this.dispatchTick(symbol, data)
       } catch {}
     }, 5000)
     this.pollers.set(symbol, pollInterval)
@@ -291,6 +472,15 @@ export class RealTimeData {
     this.sockets.clear()
     this.pollers.forEach(id => clearInterval(id))
     this.pollers.clear()
+    this.subscriberState.forEach((map) => {
+      map.forEach((state) => {
+        if (state.timeout) {
+          clearTimeout(state.timeout)
+        }
+      })
+      map.clear()
+    })
+    this.subscriberState.clear()
     this.subscribers.clear()
   }
 }

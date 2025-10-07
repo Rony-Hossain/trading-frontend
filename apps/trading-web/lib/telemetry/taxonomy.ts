@@ -4,6 +4,11 @@
  * Last updated: 2025-10-03
  */
 
+import { getPerformanceRating, WEB_VITALS_THRESHOLDS } from '@/lib/performance/budgets'
+import type { WebVitalsThresholds } from '@/lib/performance/budgets'
+import type { LaunchKpiSnapshot } from '@/lib/analytics/launch-kpi-tracker'
+import { sanitizeTelemetryPayload } from '@/lib/privacy/sanitize'
+
 // =============================================================================
 // EVENT CATEGORIES
 // =============================================================================
@@ -284,7 +289,7 @@ export interface TradeModeIndicatorViewedEvent {
 export interface PerformanceMetricEvent {
   category: TelemetryCategory.PERFORMANCE
   action: 'performance_metric'
-  metric: 'lcp' | 'fid' | 'cls' | 'ttfb' | 'inp'
+  metric: 'lcp' | 'fid' | 'cls' | 'ttfb' | 'inp' | 'fcp'
   value: number
   rating: 'good' | 'needs-improvement' | 'poor'
   page: string
@@ -296,6 +301,33 @@ export interface RealtimeThrottledEvent {
   max_points_exceeded: boolean
   update_rate_ms: number
   dropped_updates: number
+}
+
+export interface PerformanceBudgetViolationEvent {
+  category: TelemetryCategory.PERFORMANCE
+  action: 'performance_budget_violation'
+  route: string
+  metric: 'lcp' | 'inp' | 'ttfb' | 'fcp'
+  budget: number
+  actual: number
+  overage_pct: number
+}
+
+export interface LaunchKpiEvent {
+  category: TelemetryCategory.PERFORMANCE
+  action: 'launch_kpi_snapshot'
+  beginner_activation_pct: number
+  alert_follow_through_pct: number
+  median_alert_pnl: number
+  alert_helpfulness_pct: number
+  loss_cap_saves: number
+  sample_size: number
+}
+
+export interface LaunchReviewScheduledEvent {
+  category: TelemetryCategory.PERFORMANCE
+  action: 'launch_review_scheduled'
+  review_date: string
 }
 
 export interface BundleSizeEvent {
@@ -512,6 +544,9 @@ export interface InsightHelpfulEvent {
   category: TelemetryCategory.ML_INSIGHTS
   action: 'insight_helpful' | 'insight_confusing'
   insight_type: 'driver' | 'regime' | 'diagnostics'
+  driver_name?: string
+  driver_category?: string
+  contribution?: number
 }
 
 // =============================================================================
@@ -627,6 +662,9 @@ export type TelemetryEvent =
   | TradeModeIndicatorViewedEvent
   | PerformanceMetricEvent
   | RealtimeThrottledEvent
+  | PerformanceBudgetViolationEvent
+  | LaunchKpiEvent
+  | LaunchReviewScheduledEvent
   | BundleSizeEvent
   | ErrorOccurredEvent
   | RateLimitHitEvent
@@ -682,8 +720,9 @@ export interface TelemetryService {
  */
 export function trackEvent(event: TelemetryEvent): void {
   // TODO: Integrate with observability stack (PostHog, Mixpanel, etc.)
+  const sanitized = sanitizeTelemetryPayload(event as Record<string, unknown>) as TelemetryEvent
   if (process.env.NODE_ENV === 'development') {
-    console.log('[Telemetry]', event.category, event.action, event)
+    console.log('[Telemetry]', sanitized.category, sanitized.action, sanitized)
   }
 }
 
@@ -712,8 +751,18 @@ export function trackPerformance(
   value: number,
   page: string
 ): void {
-  const rating: PerformanceMetricEvent['rating'] =
-    value < 2500 ? 'good' : value < 4000 ? 'needs-improvement' : 'poor'
+  const hasThreshold = Object.prototype.hasOwnProperty.call(
+    WEB_VITALS_THRESHOLDS.good,
+    metric
+  )
+
+  const rating: PerformanceMetricEvent['rating'] = hasThreshold
+    ? getPerformanceRating(metric as keyof WebVitalsThresholds, value)
+    : value < 2500
+      ? 'good'
+      : value < 4000
+        ? 'needs-improvement'
+        : 'poor'
 
   trackEvent({
     category: TelemetryCategory.PERFORMANCE,
@@ -722,6 +771,42 @@ export function trackPerformance(
     value,
     rating,
     page,
+  })
+}
+
+/**
+ * Track performance budget violation
+ */
+export function trackPerformanceBudgetViolation(event: PerformanceBudgetViolationEvent): void {
+  trackEvent({
+    category: TelemetryCategory.PERFORMANCE,
+    action: 'performance_budget_violation',
+    route: event.route,
+    metric: event.metric,
+    budget: event.budget,
+    actual: event.actual,
+    overage_pct: event.overage_pct,
+  })
+}
+
+export function trackLaunchKpiSnapshot(snapshot: LaunchKpiSnapshot): void {
+  trackEvent({
+    category: TelemetryCategory.PERFORMANCE,
+    action: 'launch_kpi_snapshot',
+    beginner_activation_pct: Number(snapshot.beginnerActivationPct.toFixed(2)),
+    alert_follow_through_pct: Number(snapshot.alertFollowThroughPct.toFixed(2)),
+    median_alert_pnl: Number(snapshot.medianAlertPnl.toFixed(2)),
+    alert_helpfulness_pct: Number(snapshot.alertHelpfulnessPct.toFixed(2)),
+    loss_cap_saves: snapshot.lossCapSaves,
+    sample_size: snapshot.sampleSize,
+  })
+}
+
+export function scheduleLaunchReview(reviewDate: Date): void {
+  trackEvent({
+    category: TelemetryCategory.PERFORMANCE,
+    action: 'launch_review_scheduled',
+    review_date: reviewDate.toISOString(),
   })
 }
 

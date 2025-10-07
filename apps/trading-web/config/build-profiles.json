@@ -1,0 +1,11 @@
+{
+  "default": {
+    "disable": []
+  },
+  "beginner-lite": {
+    "disable": ["options", "indicators", "diagnostics", "ml-insights"]
+  },
+  "expert-only": {
+    "disable": ["today", "alerts", "learn"]
+  }
+}

@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { marketDataAPI, HistoricalData, realTimeData, StockPrice } from '../lib/api'
+import { formatCurrency, formatNumber, formatPercent, formatTime, formatDate } from '../lib/i18n/format'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { BarChart3, TrendingUp } from 'lucide-react'
 
@@ -10,16 +11,19 @@ interface StockChartProps {
   symbol: string
   period?: string
   height?: number
+  mode?: 'beginner' | 'expert'
+  onPeriodChange?: (period: string) => void
 }
 
-export function StockChart({ symbol, period = '1y', height = 400 }: StockChartProps) {
+const MAX_POINTS = 500
+
+export function StockChart({ symbol, period = '1y', height = 400, mode = 'beginner', onPeriodChange }: StockChartProps) {
   const [data, setData] = useState<HistoricalData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [chartType, setChartType] = useState<'line' | 'area'>('area')
   const [yDomain, setYDomain] = useState<[number, number] | null>(null)
-  const pendingTickRef = useRef<StockPrice | null>(null)
-  const flushTimerRef = useRef<NodeJS.Timeout | null>(null)
+  void onPeriodChange
 
   const computeDomain = (points: HistoricalData[]): [number, number] => {
     if (!points.length) return [0, 1]
@@ -43,20 +47,22 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
           : await marketDataAPI.getHistoricalData(symbol, period)
         
         // Process data for chart
-        const processedData = data.map((item) => ({
-          ...item,
-          date: period === '1d' 
-            ? new Date(item.date).toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
-              })
-            : new Date(item.date).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric',
-                year: period.includes('y') ? 'numeric' : undefined
-              })
-        }))
+        const processedData = data.map((item) => {
+          const dateObj = new Date(item.date)
+          const formattedDate =
+            period === '1d'
+              ? formatTime(dateObj)
+              : formatDate(dateObj, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: period.includes('y') ? 'numeric' : undefined,
+                })
+
+          return {
+            ...item,
+            date: formattedDate,
+          }
+        })
         
         setData(processedData)
         setYDomain(computeDomain(processedData))
@@ -72,23 +78,17 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
     fetchHistoricalData()
   }, [symbol, period])
 
-  // Real-time subscription: buffer ticks and flush at most once per second
+  // Real-time subscription with built-in throttling/backpressure
   useEffect(() => {
-    const onTick = (tick: StockPrice) => {
-      pendingTickRef.current = tick
-    }
-
-    // Start a flush timer (1000ms)
-    flushTimerRef.current = setInterval(() => {
-      const tick = pendingTickRef.current
-      if (!tick) return
-
-      pendingTickRef.current = null
-
+    const handleTick = (tick: StockPrice) => {
       const now = new Date()
       const label = period.includes('d')
-        ? now.toLocaleTimeString('en-US', { hour12: false })
-        : now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        ? formatTime(now)
+        : formatDate(now, {
+            month: 'short',
+            day: 'numeric',
+            year: period.includes('y') ? 'numeric' : undefined,
+          })
 
       const nextPoint: HistoricalData = {
         date: label,
@@ -99,27 +99,32 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
         volume: tick.volume ?? 0,
       }
 
-      setData(prev => {
-        const updated = [...prev, nextPoint]
-        const sliced = updated.slice(Math.max(0, updated.length - 500))
-        const [minY, maxY] = yDomain ?? computeDomain(sliced)
-        if (nextPoint.low < minY || nextPoint.high > maxY) {
-          setYDomain(computeDomain(sliced))
+      setData((previous) => {
+        const updated = [...previous, nextPoint]
+        if (updated.length > MAX_POINTS) {
+          updated.splice(0, updated.length - MAX_POINTS)
         }
-        return sliced
-      })
-    }, 1000)
 
-    realTimeData.subscribe(symbol, onTick)
-    return () => {
-      realTimeData.unsubscribe(symbol, onTick)
-      if (flushTimerRef.current) {
-        clearInterval(flushTimerRef.current)
-        flushTimerRef.current = null
-      }
-      pendingTickRef.current = null
+        setYDomain((previousDomain) => {
+          if (!previousDomain) {
+            return computeDomain(updated)
+          }
+          const [minY, maxY] = previousDomain
+          if (nextPoint.low < minY || nextPoint.high > maxY) {
+            return computeDomain(updated)
+          }
+          return previousDomain
+        })
+
+        return updated
+      })
     }
-  }, [symbol, period, yDomain])
+
+    realTimeData.subscribe(symbol, handleTick, { mode })
+    return () => {
+      realTimeData.unsubscribe(symbol, handleTick)
+    }
+  }, [symbol, mode, period])
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -128,11 +133,11 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="font-semibold">{label}</p>
           <div className="space-y-1 text-sm">
-            <p className="text-blue-600">Close: ${data.close.toFixed(2)}</p>
-            <p className="text-gray-600">Open: ${data.open.toFixed(2)}</p>
-            <p className="text-gray-600">High: ${data.high.toFixed(2)}</p>
-            <p className="text-gray-600">Low: ${data.low.toFixed(2)}</p>
-            <p className="text-gray-600">Volume: {data.volume.toLocaleString()}</p>
+            <p className="text-blue-600">Close: {formatCurrency(data.close)}</p>
+            <p className="text-gray-600">Open: {formatCurrency(data.open)}</p>
+            <p className="text-gray-600">High: {formatCurrency(data.high)}</p>
+            <p className="text-gray-600">Low: {formatCurrency(data.low)}</p>
+            <p className="text-gray-600">Volume: {formatNumber(data.volume, { maximumFractionDigits: 0 })}</p>
           </div>
         </div>
       )
@@ -174,11 +179,16 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
     )
   }
 
-  const firstPrice = data[0]?.close || 0
-  const lastPrice = data[data.length - 1]?.close || 0
+  const firstPrice = data[0]?.close ?? 0
+  const lastPrice = data[data.length - 1]?.close ?? 0
   const priceChange = lastPrice - firstPrice
-  const priceChangePercent = ((priceChange / firstPrice) * 100)
+  const priceChangeRatio = firstPrice ? priceChange / firstPrice : 0
   const isPositive = priceChange >= 0
+  const formattedChange = formatCurrency(Math.abs(priceChange))
+  const formattedChangePercent = formatPercent(Math.abs(priceChangeRatio), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 
   return (
     <Card>
@@ -193,8 +203,14 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
             {/* Period Performance */}
             <div className={`flex items-center space-x-1 text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
               <TrendingUp className={`h-4 w-4 ${!isPositive ? 'rotate-180' : ''}`} />
-              <span>{isPositive ? '+' : ''}${priceChange.toFixed(2)}</span>
-              <span>({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)</span>
+              <span>
+                {isPositive ? '+' : '-'}
+                {formattedChange}
+              </span>
+              <span>
+                ({isPositive ? '+' : '-'}
+                {formattedChangePercent})
+              </span>
             </div>
             
             {/* Chart Type Toggle */}
@@ -240,7 +256,9 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
               <YAxis 
                 tick={{ fontSize: 12 }}
                 domain={yDomain ?? ['auto', 'auto'] as any}
-                tickFormatter={(value) => `$${value.toFixed(0)}`}
+                tickFormatter={(value) =>
+                  formatCurrency(value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                }
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
@@ -264,7 +282,9 @@ export function StockChart({ symbol, period = '1y', height = 400 }: StockChartPr
               <YAxis 
                 tick={{ fontSize: 12 }}
                 domain={yDomain ?? ['auto', 'auto'] as any}
-                tickFormatter={(value) => `$${value.toFixed(0)}`}
+                tickFormatter={(value) =>
+                  formatCurrency(value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                }
               />
               <Tooltip content={<CustomTooltip />} />
               <Line

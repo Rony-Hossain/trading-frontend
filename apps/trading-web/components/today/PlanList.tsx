@@ -12,10 +12,13 @@ import { usePlanQuery } from '@/lib/hooks/usePlanQuery'
 import { getCopy } from '@/lib/copy/copy-service'
 import { getEmptyState, getLoadingState } from '@/lib/states/vocabulary'
 import { trackEvent } from '@/lib/telemetry/taxonomy'
+import { launchKpiTracker } from '@/lib/analytics/launch-kpi-tracker'
+import { StaleDataBanner } from '@/components/system/StaleDataBanner'
 
 export function PlanList() {
   const { data, isLoading, error, refetch, isStale } = usePlanQuery()
   const firstPlanTimeRef = useRef<number | null>(null)
+  const lastCapStatusRef = useRef<string | null>(null)
 
   const mode = data?.mode || 'beginner'
 
@@ -39,6 +42,15 @@ export function PlanList() {
       })
     }
   }, [isLoading, data])
+
+  useEffect(() => {
+    const status = data?.daily_cap?.status
+    if (!status) return
+    if (status === 'hit' && lastCapStatusRef.current !== 'hit') {
+      launchKpiTracker.recordLossCapSave()
+    }
+    lastCapStatusRef.current = status
+  }, [data?.daily_cap?.status])
 
   // Loading state
   if (isLoading) {
@@ -89,28 +101,23 @@ export function PlanList() {
   }
 
   // Stale data warning
-  const isDataStale = isStale || (data?.metadata?.generated_at &&
-    (Date.now() - new Date(data.metadata.generated_at).getTime()) > 5 * 60 * 1000)
+  const generatedAt = data?.metadata?.generated_at ? new Date(data.metadata.generated_at) : null
+  const isDataStale =
+    isStale ||
+    (generatedAt ? Date.now() - generatedAt.getTime() > 5 * 60 * 1000 : false)
+  const lastUpdated = generatedAt ?? new Date(Date.now() - 5 * 60 * 1000)
 
   return (
     <Box>
       {isDataStale && (
-        <Alert
-          severity="warning"
-          sx={{ mb: 3 }}
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => refetch()}
-              startIcon={<RefreshOutlined />}
-            >
-              {getCopy('action.refresh', mode)}
-            </Button>
-          }
-        >
-          {getCopy('banner.stale_data', mode)}
-        </Alert>
+        <Box sx={{ mb: 3 }}>
+          <StaleDataBanner
+            lastUpdated={lastUpdated}
+            maxAgeSeconds={5 * 60}
+            onRefresh={() => refetch()}
+            mode={mode}
+          />
+        </Box>
       )}
 
       {/* Daily cap status */}

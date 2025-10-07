@@ -1,29 +1,41 @@
 "use client"
 
 import React from 'react'
-import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material'
+import { AppBar, Toolbar, Typography, Button, Box, Badge } from '@mui/material'
 import { useRouter, usePathname } from 'next/navigation'
-import { TrendingUp, Timeline, AccountBalance, ShowChart } from '@mui/icons-material'
+import { TrendingUp, Timeline, AccountBalance, ShowChart, AdminPanelSettings } from '@mui/icons-material'
+import { Sparkles } from 'lucide-react'
+import { getCopy, type CopyMode } from '../lib/copy/copy-service'
+import { isModuleDisabled } from '../lib/security/disabled-modules'
 
-export default function Navigation() {
+interface NavigationProps {
+  onOpenWhatsNew?: () => void
+  hasWhatsNew?: boolean
+}
+
+export default function Navigation({ onOpenWhatsNew, hasWhatsNew = false }: NavigationProps) {
   const router = useRouter()
   const pathname = usePathname()
 
+  const mode: CopyMode = 'beginner'
   const navigationItems = [
-    { path: '/', label: 'Home', icon: <ShowChart /> },
-    { path: '/daytrading', label: 'Day Trading', icon: <TrendingUp /> },
-    { path: '/options', label: 'Options Trading', icon: <Timeline /> },
-    { path: '/portfolio', label: 'Portfolio', icon: <AccountBalance /> },
+    { path: '/', labelKey: 'nav.home', icon: <ShowChart /> },
+    { path: '/daytrading', labelKey: 'nav.day_trading', icon: <TrendingUp />, moduleId: 'indicators' },
+    { path: '/options', labelKey: 'nav.options', icon: <Timeline />, moduleId: 'options' },
+    { path: '/portfolio', labelKey: 'nav.portfolio', icon: <AccountBalance /> },
+    { path: '/admin/site-config', labelKey: 'nav.admin', icon: <AdminPanelSettings /> },
   ]
+
+  const visibleItems = navigationItems.filter((item) => !item.moduleId || !isModuleDisabled(item.moduleId))
 
   return (
     <AppBar position="static" elevation={1}>
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Trading Platform
+          {getCopy('nav.brand', mode)}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {navigationItems.map((item) => (
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          {visibleItems.map((item) => (
             <Button
               key={item.path}
               color="inherit"
@@ -37,9 +49,37 @@ export default function Navigation() {
                 }
               }}
             >
-              {item.label}
+              {getCopy(item.labelKey, mode)}
             </Button>
           ))}
+          {onOpenWhatsNew && (
+            hasWhatsNew ? (
+              <Badge
+                color="secondary"
+                variant="dot"
+                overlap="circular"
+                sx={{ '& .MuiBadge-badge': { top: 4, right: 4 } }}
+              >
+                <Button
+                  color="inherit"
+                  startIcon={<Sparkles size={16} />}
+                  onClick={onOpenWhatsNew}
+                  variant="text"
+                >
+                  What&apos;s new
+                </Button>
+              </Badge>
+            ) : (
+              <Button
+                color="inherit"
+                startIcon={<Sparkles size={16} />}
+                onClick={onOpenWhatsNew}
+                variant="text"
+              >
+                What&apos;s new
+              </Button>
+            )
+          )}
         </Box>
       </Toolbar>
     </AppBar>

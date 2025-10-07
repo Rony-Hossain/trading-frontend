@@ -24,7 +24,7 @@ import {
 } from '@mui/material'
 import { TrendingUp, Star, User, ChevronDown, BarChart3, LineChart, Zap } from 'lucide-react'
 import { StockPrice } from '../StockPrice'
-import { StockChart } from '../StockChart'
+import dynamic from 'next/dynamic'
 import { TechnicalIndicators } from '../TechnicalIndicators'
 import { TechnicalAnalysis } from '../TechnicalAnalysis'
 import { Portfolio } from '../Portfolio'
@@ -217,7 +217,12 @@ function MaterialDashboardImpl({ defaultSymbol = 'AAPL' }: { defaultSymbol?: str
                     <ToggleButton value="1y">Year</ToggleButton>
                   </ToggleButtonGroup>
                 </Paper>
-                <StockChart symbol={selectedSymbol} period={chartPeriod} onPeriodChange={setChartPeriod} />
+                <StockChart
+                  symbol={selectedSymbol}
+                  period={chartPeriod}
+                  onPeriodChange={setChartPeriod}
+                  mode="expert"
+                />
                 <TradingSignals watchlist={watchlist} onSymbolSelect={handleSymbolChange} />
               </Box>
             )}
@@ -278,3 +283,9 @@ function MaterialDashboardImpl({ defaultSymbol = 'AAPL' }: { defaultSymbol?: str
 
 export const MaterialDashboard = React.memo(MaterialDashboardImpl)
 export default MaterialDashboard
+const StockChart = dynamic(() => import('../StockChart').then((mod) => mod.StockChart), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full animate-pulse rounded-xl bg-gray-100" />
+  ),
+})

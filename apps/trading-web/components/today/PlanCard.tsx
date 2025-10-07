@@ -31,6 +31,7 @@ import { PlanBudget } from './PlanBudget'
 import { PlanConfidencePill } from './PlanConfidencePill'
 import { PlanBadges } from './PlanBadges'
 import { ExplainChip } from './ExplainChip'
+import NewsQuickList from '@/components/news/NewsQuickList'
 
 interface PlanCardProps {
   pick: Pick
@@ -148,6 +149,12 @@ export function PlanCard({ pick, mode }: PlanCardProps) {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <PlanSafety pick={pick} mode={mode} />
             <PlanBudget pick={pick} mode={mode} />
+
+            {pick.news && pick.news.length > 0 && (
+              <Box>
+                <NewsQuickList items={pick.news} mode={mode} />
+              </Box>
+            )}
 
             {/* Expert mode: drivers */}
             {mode === 'expert' && pick.drivers && pick.drivers.length > 0 && (

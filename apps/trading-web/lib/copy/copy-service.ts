@@ -4,6 +4,8 @@
  * Last updated: 2025-10-03
  */
 
+import { localizeText } from '@/lib/i18n/translate'
+
 export type CopyMode = 'beginner' | 'expert'
 
 interface CopyVariant {
@@ -16,6 +18,32 @@ interface CopyVariant {
  * Each key provides plain language for beginners and technical terms for experts
  */
 export const COPY_MAP: Record<string, CopyVariant> = {
+  // NAVIGATION
+  'nav.brand': {
+    beginner: 'Trading Platform',
+    expert: 'Trading Platform',
+  },
+  'nav.home': {
+    beginner: 'Home',
+    expert: 'Overview',
+  },
+  'nav.day_trading': {
+    beginner: 'Day Trading',
+    expert: 'Intraday Desk',
+  },
+  'nav.options': {
+    beginner: 'Options Trading',
+    expert: 'Options Desk',
+  },
+  'nav.portfolio': {
+    beginner: 'Portfolio',
+    expert: 'Positions',
+  },
+  'nav.admin': {
+    beginner: 'Admin',
+    expert: 'Admin',
+  },
+
   // PLAN / TODAY VIEW
   'plan.title': {
     beginner: "Today's Plan",
@@ -361,6 +389,58 @@ export const COPY_MAP: Record<string, CopyVariant> = {
     beginner: 'You will not receive any notifications',
     expert: 'Alert notifications disabled',
   },
+  'alerts.realtime_title': {
+    beginner: 'Real-time Alerts',
+    expert: 'Streaming Alerts',
+  },
+  'alerts.realtime_empty': {
+    beginner: 'No alerts yet. Listening for signals…',
+    expert: 'Feed warming up. Awaiting triggers…',
+  },
+  'alerts.option_suggestion': {
+    beginner: 'Option Suggestion',
+    expert: 'Options Play',
+  },
+  'alerts.option_target': {
+    beginner: 'Target',
+    expert: 'Target',
+  },
+  'alerts.option_stop': {
+    beginner: 'Stop',
+    expert: 'Stop',
+  },
+  'alerts.option_max_pl': {
+    beginner: 'Max P/L',
+    expert: 'Max P/L',
+  },
+  'alerts.option_probability': {
+    beginner: 'Chance of profit',
+    expert: 'Prob. Profit',
+  },
+  'alerts.option_strikes': {
+    beginner: 'Strikes',
+    expert: 'Strikes',
+  },
+  'alerts.canary_prompt': {
+    beginner: 'Take action sooner to capture momentum.',
+    expert: 'Consider immediate execution to capture the edge.',
+  },
+  'feedback.prompt': {
+    beginner: 'Was this helpful?',
+    expert: 'Was this insight useful?',
+  },
+  'feedback.thanks': {
+    beginner: 'Thanks for the feedback — it helps us improve.',
+    expert: 'Feedback captured. Thanks for the signal.',
+  },
+  'feedback.yes': {
+    beginner: 'Yes',
+    expert: 'Helpful',
+  },
+  'feedback.no': {
+    beginner: 'No',
+    expert: 'Needs work',
+  },
   'alerts.conditions': {
     beginner: 'conditions',
     expert: 'rules',
@@ -527,6 +607,10 @@ export const COPY_MAP: Record<string, CopyVariant> = {
     beginner: 'This information is a bit old. Refresh for the latest.',
     expert: 'Data stale. Refresh recommended.',
   },
+  'banner.stale_hint': {
+    beginner: 'Last updated {relative}. Refresh to get the latest info.',
+    expert: 'Snapshot aged {relative}. Refresh to resync feed.',
+  },
   'banner.degraded': {
     beginner: 'Some features may be limited right now.',
     expert: 'Service degraded. Some features unavailable.',
@@ -535,11 +619,23 @@ export const COPY_MAP: Record<string, CopyVariant> = {
     beginner: "You're offline. Reconnect to trade.",
     expert: 'Offline. Reconnect to resume.',
   },
+  'banner.rate_limit': {
+    beginner: 'Taking a quick pause to avoid server limits.',
+    expert: 'Rate limit reached. Backing off briefly.',
+  },
+  'banner.rate_limit_hint': {
+    beginner: 'We will retry automatically, or refresh to try again sooner.',
+    expert: 'Auto-retry scheduled. Manual refresh attempts sooner.',
+  },
 
   // ACTIONS
   'action.refresh': {
     beginner: 'Refresh',
     expert: 'Reload',
+  },
+  'action.retry': {
+    beginner: 'Try Again',
+    expert: 'Retry',
   },
   'action.details': {
     beginner: 'See Details',
@@ -557,6 +653,20 @@ export const COPY_MAP: Record<string, CopyVariant> = {
     beginner: 'Confirm',
     expert: 'Confirm',
   },
+  'action.close': {
+    beginner: 'Close',
+    expert: 'Dismiss',
+  },
+
+  // MODULE GUARDS
+  'module.disabled.title': {
+    beginner: 'Feature unavailable',
+    expert: 'Module disabled',
+  },
+  'module.disabled.body': {
+    beginner: 'This area is not included in your current plan. Please contact support to enable it.',
+    expert: 'This module is excluded for the active build profile. Enable it in your tenant configuration to access these tools.',
+  },
 }
 
 /**
@@ -568,7 +678,7 @@ export function getCopy(key: string, mode: CopyMode = 'beginner'): string {
     console.warn(`CopyService: Missing key "${key}"`)
     return key
   }
-  return variant[mode]
+  return localizeText(variant[mode])
 }
 
 /**
