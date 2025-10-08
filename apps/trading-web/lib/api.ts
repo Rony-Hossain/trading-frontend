@@ -6,12 +6,31 @@ import { notifyRateLimitHit, clearRateLimit } from '@/lib/network/status'
 // API Configuration
 const MARKET_DATA_API = process.env.NEXT_PUBLIC_MARKET_DATA_API || 'http://localhost:8002'
 const ANALYSIS_API = process.env.NEXT_PUBLIC_ANALYSIS_API || 'http://localhost:8003'
+const MARKET_DATA_INTERNAL_API =
+  process.env.MARKET_DATA_INTERNAL_URL || MARKET_DATA_API || 'http://localhost:8002'
 
 // Create axios instances
 const marketDataClient = axios.create({
-  baseURL: MARKET_DATA_API,
+  baseURL: MARKET_DATA_INTERNAL_API,
   timeout: 10000,
 })
+
+if (typeof window !== 'undefined') {
+  marketDataClient.interceptors.request.use((config) => {
+    if (!config.url) {
+      return config
+    }
+
+    if (/^https?:\/\//i.test(config.url)) {
+      return config
+    }
+
+    const normalizedPath = config.url.startsWith('/') ? config.url : `/${config.url}`
+    config.baseURL = window.location.origin
+    config.url = `/api${normalizedPath}`
+    return config
+  })
+}
 
 const analysisClient = axios.create({
   baseURL: ANALYSIS_API,
@@ -143,19 +162,60 @@ export interface ForecastData {
 export const marketDataAPI = {
   // Get real-time stock price
   getStockPrice: async (symbol: string): Promise<StockPrice> => {
-    const response = await marketDataClient.get(`/stocks/${symbol}/price`)
-    return response.data
+    const endpoint = `/api/stocks/${encodeURIComponent(symbol)}/price`
+
+    let response: Response
+    try {
+      response = await fetch(endpoint, { cache: 'no-store' })
+    } catch (error) {
+      throw new Error(`Network error while fetching stock price: ${(error as Error).message}`)
+    }
+
+    if (response.ok) {
+      clearRateLimit('market-data')
+      return response.json()
+    }
+
+    const bodyText = await response.text()
+    let message: string | undefined
+
+    try {
+      const parsed = JSON.parse(bodyText)
+      message = parsed?.message || parsed?.error
+    } catch {
+      message = bodyText || undefined
+    }
+
+    if (response.status === 429) {
+      notifyRateLimitHit({
+        source: 'market-data',
+        retryAt: parseRetryAfter(response.headers.get('retry-after')),
+        limit: Number(response.headers.get('x-ratelimit-limit')) || undefined,
+        remaining: Number(response.headers.get('x-ratelimit-remaining')) || undefined,
+        message,
+      })
+    }
+
+    throw new Error(
+      `Failed to fetch stock price (${response.status}): ${message ?? 'Unknown error'}`
+    )
   },
 
   // Get historical data
   getHistoricalData: async (symbol: string, period: string = '1y'): Promise<HistoricalData[]> => {
-    const response = await marketDataClient.get(`/stocks/${symbol}/history?period=${period}`)
+    const encodedSymbol = encodeURIComponent(symbol)
+    const response = await marketDataClient.get(`/stocks/${encodedSymbol}/history`, {
+      params: { period },
+    })
     return response.data.data
   },
 
   // Get intraday data (1-minute bars)
   getIntradayData: async (symbol: string, interval: string = '1m'): Promise<HistoricalData[]> => {
-    const response = await marketDataClient.get(`/stocks/${symbol}/intraday?interval=${interval}`)
+    const encodedSymbol = encodeURIComponent(symbol)
+    const response = await marketDataClient.get(`/stocks/${encodedSymbol}/intraday`, {
+      params: { interval },
+    })
     if (response.data.data) {
       return response.data.data.map((item: any) => ({
         date: item.timestamp,

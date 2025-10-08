@@ -85,9 +85,17 @@ export default function OptionsAnalysis({ symbol, tradingType = 'all', showEduca
     setLoading(true)
     setError('')
     try {
+      const encodedSymbol = encodeURIComponent(symbol)
+      const suggestionsParams = new URLSearchParams({
+        sentiment,
+        target_delta: String(targetDelta),
+        max_dte: String(maxDTE),
+      })
+
       // Fetch suggestions based on trading type
       const suggestionsResponse = await fetch(
-        `http://localhost:8002/options/${symbol}/suggestions?sentiment=${sentiment}&target_delta=${targetDelta}&max_dte=${maxDTE}`
+        `/api/options/${encodedSymbol}/suggestions?${suggestionsParams.toString()}`,
+        { cache: 'no-store' }
       )
       if (suggestionsResponse.ok) {
         const suggestionsData = await suggestionsResponse.json()
@@ -95,15 +103,23 @@ export default function OptionsAnalysis({ symbol, tradingType = 'all', showEduca
       }
 
       // Fetch full options chain
-      const chainResponse = await fetch(`http://localhost:8002/options/${symbol}/chain`)
+      const chainResponse = await fetch(`/api/options/${encodedSymbol}/chain`, {
+        cache: 'no-store',
+      })
       if (chainResponse.ok) {
         const chainData = await chainResponse.json()
         setOptionsChain([...chainData.calls, ...chainData.puts] || [])
       }
 
+      const strategiesParams = new URLSearchParams({
+        sentiment,
+        complexity: strategyComplexity,
+      })
+
       // Fetch advanced strategies
       const strategiesResponse = await fetch(
-        `http://localhost:8002/options/${symbol}/strategies?sentiment=${sentiment}&complexity=${strategyComplexity}`
+        `/api/options/${encodedSymbol}/strategies?${strategiesParams.toString()}`,
+        { cache: 'no-store' }
       )
       if (strategiesResponse.ok) {
         const strategiesData = await strategiesResponse.json()

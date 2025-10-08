@@ -39,7 +39,15 @@ export default function OptionsGreeks({ symbol }: Props) {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch(`http://localhost:8002/options/${symbol}/suggestions?sentiment=bullish&target_delta=0.3&max_dte=7`)
+      const params = new URLSearchParams({
+        sentiment: 'bullish',
+        target_delta: '0.3',
+        max_dte: '7',
+      })
+      const response = await fetch(
+        `/api/options/${encodeURIComponent(symbol)}/suggestions?${params.toString()}`,
+        { cache: 'no-store' }
+      )
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }

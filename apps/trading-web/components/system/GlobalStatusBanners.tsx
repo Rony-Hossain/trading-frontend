@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, CloudOff, RefreshCw } from 'lucide-react'
 import { getCopy, type CopyMode } from '../../lib/copy/copy-service'
 import { useNetworkStatus } from '../../hooks/useNetworkStatus'
@@ -75,6 +75,15 @@ function RateLimitBanner({ status }: { status: NetworkStatusState }) {
 
 export function GlobalStatusBanners() {
   const status = useNetworkStatus()
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  if (!isHydrated) {
+    return null
+  }
 
   if (status.online && status.rateLimits.length === 0) {
     return null
